@@ -2,21 +2,20 @@ Summary: A simple program that emulates the detach feature of screen.
 Name: dtach
 Version: 0.4
 Release: 1
-Copyright: GPL
+License: GPL
 URL: http://dtach.sourceforge.net
 Group: Applications/System
-Source: dtach-%{version}.tar.gz
-Prefix: /usr
-Buildroot: %{_tmppath}/%{name}-%{version}-buildroot
-Obsoletes: detach
+Source: http://prdownloads.sourceforge.net/dtach/dtach-%{version}.tar.gz
+Buildroot: %{_tmppath}/%{name}-%{version}-root
  
 %description
-dtach is a program that emulates the detach feature of screen, without the
-other overhead that screen has. It is designed to be transparent and
-un-intrusive; it avoids interpreting the input and output between attached
-terminals and the program under its control. Consequently, it works best with
+
+dtach is a program that emulates the detach feature of screen, with
+less overhead.  It is designed to be transparent and un-intrusive; it
+avoids interpreting the input and output between attached terminals
+and the program under its control. Consequently, it works best with
 full-screen applications such as emacs.
- 
+  
 %prep
 %setup
  
@@ -30,7 +29,6 @@ mkdir -p $RPM_BUILD_ROOT/%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/doc/dtach-%{version}
 mkdir -p $RPM_BUILD_ROOT/%{_mandir}/man1
 install -m 755 dtach $RPM_BUILD_ROOT/%{_bindir}/dtach
-install -m 644 COPYING $RPM_BUILD_ROOT/usr/share/doc/dtach-%{version}
 install -m 644 dtach.1 $RPM_BUILD_ROOT/%{_mandir}/man1/dtach.1
 
 %clean
@@ -40,11 +38,17 @@ rm -rf $RPM_BUILD_DIR/%{name}-%{version}
 
 %files
 %defattr(-,root,root,-)
-%doc /usr/share/doc/dtach-%{version}/COPYING
+%doc COPYING README
 %{_bindir}/dtach
-%{_mandir}/man1/*
+%{_mandir}/*/*
 
 %changelog
+* Fri Nov 30 2001 Trond Eivind Glomsrød <teg@redhat.com> 0.4-1
+- s/Copyright/License/
+- Minor description change
+- fix use of %%doc
+- Add full location of source tarball
+
 * Sat Nov 03 2001 Ned T. Crigler <crigler@hell-city.org> 0.4
 - Portability updates thanks to sourceforge's compile farm. dtach should now
   work on: FreeBSD, Debian/alpha, Debian/PPC, Debian/sparc, Debian/PPC, and
