@@ -110,6 +110,7 @@ When the detach character is pressed,
 detaches itself from the current session and exits. The process running in
 the session is unaffected by the detach. By default, the detach character is
 set to ^\\ (Ctrl-\\).
+
 .TP
 .B \-E
 Disables the detach character.
@@ -117,6 +118,30 @@ Disables the detach character.
 does not try to scan input from the terminal for a detach character. The only
 way to detach from the session is then by sending the attaching process an
 appropriate signal.
+
+.TP
+.BI "\-r " "<method>"
+Sets the redraw method to
+.IR <method> .
+The valid methods are
+.IR none ,
+.IR ctrl_l ,
+or
+.IR winch .
+
+.I none
+disables redrawing completely,
+.I ctrl_l
+sends a Ctrl L character to the program if the terminal is in
+character-at-a-time and no-echo mode, and
+.I winch
+forces a WINCH signal to be sent to the program.
+
+When creating a new session, the specified method is used as the default
+redraw method for the session. If not specified, the
+.I ctrl_l
+method is used.
+
 .TP
 .B \-z
 Disables processing of the suspend key.
@@ -143,6 +168,23 @@ Processing of the suspend character is also disabled for the attach instance.
 
 .nf
    $ dtach -A /tmp/foozle -z bash
+.fi
+
+The following example attaches to the /tmp/foozle session, using the
+.I winch
+redraw method to redraw the screen.
+
+.nf
+   $ dtach -a /tmp/foozle -r winch
+.fi
+
+The following example creates a new session and sets the default redraw method
+for the session to the
+.I winch
+redraw method.
+
+.nf
+   $ dtach -c /tmp/foozle -r winch bash
 .fi
 
 .PP
