@@ -82,6 +82,28 @@ die(int sig)
 	exit(1);
 }
 
+/* Sets a file descriptor to non-blocking mode. */
+static int
+setnonblocking(int fd)
+{
+	int flags;
+
+#if defined(O_NONBLOCK)
+	flags = fcntl(fd, F_GETFL);
+	if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+		return -1;
+	return 0;
+#elif defined(FIONBIO)
+	flags = 1;
+	if (ioctl(fd, FIONBIO, &flags) < 0)
+		return -1;
+	return 0;
+#else
+#warning Do not know how to set non-blocking mode.
+	return 0;
+#endif
+}
+
 /* Initialize the pty structure. */
 static int
 init_pty(char **argv)
@@ -113,116 +135,6 @@ init_pty(char **argv)
 	return 0;
 }
 
-/* Creates a new unix domain socket. */
-static int
-create_socket(char *name)
-{
-	int s;
-	struct sockaddr_un sockun;
-
-	s = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (s < 0)
-		return -1;
-	sockun.sun_family = AF_UNIX;
-	strcpy(sockun.sun_path, name);
-	if (bind(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
-	{
-		close(s);
-		return -1;
-	}
-	if (listen(s, 128) < 0)
-	{
-		close(s);
-		return -1;
-	}
-	/* chmod it to prevent any suprises */
-	if (chmod(name, 0600) < 0)
-	{
-		close(s);
-		return -1;
-	}
-	return s;
-}
-
-/* Sets a file descriptor to non-blocking mode. */
-static int
-setnonblocking(int fd)
-{
-	int flags;
-
-#if defined(O_NONBLOCK)
-	flags = fcntl(fd, F_GETFL);
-	if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-		return -1;
-	return 0;
-#elif defined(FIONBIO)
-	flags = 1;
-	if (ioctl(fd, FIONBIO, &flags) < 0)
-		return -1;
-	return 0;
-#else
-#warning Do not know how to set non-blocking mode.
-	return 0;
-#endif
-}
-
-/* Process activity on the pty - Input and terminal changes are sent out to
-** the attached clients. If the pty goes away, we die. */
-static void
-pty_activity()
-{
-	unsigned char buf[BUFSIZE];
-	struct client *p;
-	int len;
-
-	/* Read the pty activity */
-	len = read(the_pty.fd, buf, sizeof(buf));
-
-	/* Error -> die */
-	if (len <= 0)
-		exit(1);
-
-#ifdef BROKEN_MASTER
-	/* Get the current terminal settings. */
-	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
-		exit(1);
-#else
-	/* Get the current terminal settings. */
-	if (tcgetattr(the_pty.fd, &the_pty.term) < 0)
-		exit(1);
-#endif
-
-	/* Send it out to the clients. */
-	for (p = clients; p; p = p->next)
-	{
-		if (p->attached)
-			write(p->fd, buf, len);
-	}
-}
-
-/* Process activity on the control socket */
-static void
-control_activity(int s)
-{
-	int fd;
-	struct client *p;
- 
-	/* Accept the new client and link it in. */
-	fd = accept(s, NULL, NULL);
-	if (fd < 0 || setnonblocking(fd) < 0)
-		return;
-
-	/* Link it in. */
-	p = malloc(sizeof(struct client));
-	p->fd = fd;
-	p->attached = 0;
-	p->pprev = &clients;
-	p->next = *(p->pprev);
-	if (p->next)
-		p->next->pprev = &p->next;
-	*(p->pprev) = p;
-}
-
 /* Send a signal to the slave side of a pseudo-terminal. */
 static void
 killpty(struct pty *pty, int sig)
@@ -252,6 +164,154 @@ killpty(struct pty *pty, int sig)
 	kill(-pty->pid, sig);
 }
 
+/* Creates a new unix domain socket. */
+static int
+create_socket(char *name)
+{
+	int s;
+	struct sockaddr_un sockun;
+
+	s = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (s < 0)
+		return -1;
+	sockun.sun_family = AF_UNIX;
+	strcpy(sockun.sun_path, name);
+	if (bind(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
+	{
+		close(s);
+		return -1;
+	}
+	if (listen(s, 128) < 0)
+	{
+		close(s);
+		return -1;
+	}
+	if (setnonblocking(s) < 0)
+	{
+		close(s);
+		return -1;
+	}
+	/* chmod it to prevent any suprises */
+	if (chmod(name, 0600) < 0)
+	{
+		close(s);
+		return -1;
+	}
+	return s;
+}
+
+/* Process activity on the pty - Input and terminal changes are sent out to
+** the attached clients. If the pty goes away, we die. */
+static void
+pty_activity(int s)
+{
+	unsigned char buf[BUFSIZE];
+	int len;
+	struct client *p;
+	fd_set readfds, writefds;
+	int highest_fd, nclients;
+
+	/* Read the pty activity */
+	len = read(the_pty.fd, buf, sizeof(buf));
+
+	/* Error -> die */
+	if (len <= 0)
+		exit(1);
+
+#ifdef BROKEN_MASTER
+	/* Get the current terminal settings. */
+	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
+		exit(1);
+#else
+	/* Get the current terminal settings. */
+	if (tcgetattr(the_pty.fd, &the_pty.term) < 0)
+		exit(1);
+#endif
+
+top:
+	/*
+	** Wait until at least one client is writable. Also wait on the control
+	** socket in case a new client tries to connect.
+	*/
+	FD_ZERO(&readfds);
+	FD_ZERO(&writefds);
+	FD_SET(s, &readfds);
+	highest_fd = s;
+	for (p = clients, nclients = 0; p; p = p->next)
+	{
+		if (!p->attached)
+			continue;
+		FD_SET(p->fd, &writefds);
+		if (p->fd > highest_fd)
+			highest_fd = p->fd;
+		nclients++;
+	}
+	if (nclients == 0)
+		return;
+	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
+		return;
+
+	/* Send the data out to the clients. */
+	for (p = clients, nclients = 0; p; p = p->next)
+	{
+		int written;
+
+		if (!FD_ISSET(p->fd, &writefds))
+			continue;
+
+		written = 0;
+		while (written < len)
+		{
+			int n = write(p->fd, buf + written, len - written);
+
+			if (n > 0)
+			{
+				written += n;
+				continue;
+			}
+			else if (n < 0 && errno == EINTR)
+				continue;
+			else if (n < 0 && errno != EAGAIN)
+				nclients = -1;
+			break;
+		}
+		if (nclients != -1 && written == len)
+			nclients++;
+	}
+
+	/* Try again if nothing happened. */
+	if (!FD_ISSET(s, &readfds) && nclients == 0)
+		goto top;
+}
+
+/* Process activity on the control socket */
+static void
+control_activity(int s)
+{
+	int fd;
+	struct client *p;
+ 
+	/* Accept the new client and link it in. */
+	fd = accept(s, NULL, NULL);
+	if (fd < 0)
+		return;
+	else if (setnonblocking(fd) < 0)
+	{
+		close(fd);
+		return;
+	}
+
+	/* Link it in. */
+	p = malloc(sizeof(struct client));
+	p->fd = fd;
+	p->attached = 0;
+	p->pprev = &clients;
+	p->next = *(p->pprev);
+	if (p->next)
+		p->next->pprev = &p->next;
+	*(p->pprev) = p;
+}
+
 /* Process activity from a client. */
 static void
 client_activity(struct client *p)
@@ -261,6 +321,9 @@ client_activity(struct client *p)
 
 	/* Read the activity. */
 	len = read(p->fd, &pkt, sizeof(struct packet));
+	if (len < 0 && (errno == EAGAIN || errno == EINTR))
+		return;
+
 	/* Close the client on an error. */
 	if (len <= 0)
 	{
@@ -333,6 +396,7 @@ master_process(int s, char **argv)
 	struct client *p, *next;
 	fd_set readfds;
 	int highest_fd;
+	int nullfd;
 
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
@@ -355,10 +419,14 @@ master_process(int s, char **argv)
 	signal(SIGTERM, die);
 	signal(SIGCHLD, die);
 
-	/* Close the original terminal. We are now a daemon. */
-	fclose(stdin);
-	fclose(stdout);
-	fclose(stderr);
+	/* Make sure stdin/stdout/stderr point to /dev/null. We are now a
+	** daemon. */
+	nullfd = open("/dev/null", O_RDWR);
+	dup2(nullfd, 0);
+	dup2(nullfd, 1);
+	dup2(nullfd, 2);
+	if (nullfd > 2)
+		close(nullfd);
 
 	/* Set a trap to unlink the socket when we die. */
 	atexit(unlink_socket);
@@ -390,7 +458,7 @@ master_process(int s, char **argv)
 		}	
 		/* pty activity? */
 		if (FD_ISSET(the_pty.fd, &readfds))
-			pty_activity(&the_pty);
+			pty_activity(s);
 		/* New client? */
 		if (FD_ISSET(s, &readfds))
 			control_activity(s);
