@@ -238,7 +238,7 @@ client_activity(struct client *p)
 	struct packet pkt;
 
 	/* Read the activity. */
-	len = read(p->fd, &pkt, sizeof(pkt));
+	len = read(p->fd, &pkt, sizeof(struct packet));
 	/* Close the client on an error. */
 	if (len <= 0)
 	{
@@ -254,24 +254,9 @@ client_activity(struct client *p)
 	if (pkt.type == MSG_PUSH)
 		write(the_pty.fd, pkt.u.buf, pkt.len);
 
-	/* When attaching, we set the window size and force a redraw by sending
-	** the WINCH signal to the program.
-	**
-	** XXX: Are there any programs that don't handle the WINCH signal
-	** properly? Full-screen programs should fully redraw themselves, and
-	** line-oriented programs should redraw the prompt, or do nothing. 
-	*/
+	/* Attach or detach from the program. */
 	else if (pkt.type == MSG_ATTACH)
-	{
 		p->attached = 1;
-		if (memcmp(&the_pty.ws, &pkt.u.ws, sizeof(struct winsize)) != 0)
-		{
-			the_pty.ws = pkt.u.ws;
-			ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
-		}
-		else
-			killpty(&the_pty, SIGWINCH);
-	}
 	else if (pkt.type == MSG_DETACH)
 		p->attached = 0;
 
@@ -280,6 +265,41 @@ client_activity(struct client *p)
 	{
 		the_pty.ws = pkt.u.ws;
 		ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
+	}
+
+	/* Force a redraw using a particular method. */
+	else if (pkt.type == MSG_REDRAW)
+	{
+		int method = pkt.len;
+
+		/* If the client didn't specify a particular method, use
+		** whatever we had on startup. */
+		if (method == REDRAW_UNSPEC)
+			method = redraw_method;
+		if (method == REDRAW_NONE)
+			return;
+
+		/* Set the window size. */
+		the_pty.ws = pkt.u.ws;
+		ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
+
+		/* Send a ^L character if the terminal is in no-echo and
+		** character-at-a-time mode. */
+		if (method == REDRAW_CTRL_L)
+		{
+			char c = '\f';
+
+                	if (((the_pty.term.c_lflag & (ECHO|ICANON)) == 0) &&
+                        	(the_pty.term.c_cc[VMIN] == 1))
+			{
+				write(the_pty.fd, &c, 1);
+			}
+		}
+		/* Send a WINCH signal to the program. */
+		else if (method == REDRAW_WINCH)
+		{
+			killpty(&the_pty, SIGWINCH);
+		}
 	}
 }
 
@@ -367,6 +387,10 @@ master_main(char **argv)
 {
 	int s;
 	pid_t pid;
+
+	/* Use a default redraw method if one hasn't been specified yet. */
+	if (redraw_method == REDRAW_UNSPEC)
+		redraw_method = REDRAW_CTRL_L;
 
 	/* Create the unix domain socket. */
 	s = create_socket(sockname);

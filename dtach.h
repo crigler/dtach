@@ -74,15 +74,24 @@
 #include <sys/un.h>
 
 extern char *progname, *sockname;
-extern int detach_char, no_suspend;
+extern int detach_char, no_suspend, redraw_method;
 extern struct termios orig_term;
 
 enum
 {
-	MSG_PUSH,
-	MSG_ATTACH,
-	MSG_DETACH,
-	MSG_WINCH,
+	MSG_PUSH	= 0,
+	MSG_ATTACH	= 1,
+	MSG_DETACH	= 2,
+	MSG_WINCH	= 3,
+	MSG_REDRAW	= 4,
+};
+
+enum
+{
+	REDRAW_UNSPEC	= 0,
+	REDRAW_NONE	= 1,
+	REDRAW_CTRL_L	= 2,
+	REDRAW_WINCH	= 3,
 };
 
 /* The client to master protocol. */

@@ -35,6 +35,8 @@ char *sockname;
 int detach_char = '\\' - 64;
 /* 1 if we should not interpret the suspend character. */
 int no_suspend;
+/* The default redraw method. Initially set to unspecified. */
+int redraw_method = REDRAW_UNSPEC;
 
 /*
 ** The original terminal settings. Shared between the master and attach
@@ -63,6 +65,10 @@ usage()
 		"  -e <char>\tSet the detach character to <char>, defaults "
 		"to ^\\.\n"
 		"  -E\t\tDisable the detach character.\n"
+		"  -r <method>\tUse the specified redraw method when redrawing:\n"
+		"\t\t     none: Don't redraw at all.\n"
+		"\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
+		"\t\t    winch: Send a WINCH signal to the program.\n"
 		"  -z\t\tDisable processing of the suspend key.\n"
 		"\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
 		PACKAGE_VERSION, __DATE__, __TIME__);
@@ -151,6 +157,33 @@ main(int argc, char **argv)
 				}
 				else
 					detach_char = argv[0][0];
+				break;
+			}
+			else if (*p == 'r')
+			{
+				++argv; --argc;
+				if (argc < 1)
+				{
+					printf("%s: No redraw method "
+						"specified.\n", progname);	
+					printf("Try '%s --help' for more "
+						"information.\n", progname);
+					return 1;
+				}
+				if (strcmp(argv[0], "none") == 0)
+					redraw_method = REDRAW_NONE;
+				else if (strcmp(argv[0], "ctrl_l") == 0)
+					redraw_method = REDRAW_CTRL_L;
+				else if (strcmp(argv[0], "winch") == 0)
+					redraw_method = REDRAW_WINCH;
+				else
+				{
+					printf("%s: Invalid redraw method "
+						"specified.\n", progname);	
+					printf("Try '%s --help' for more "
+						"information.\n", progname);
+					return 1;
+				}
 				break;
 			}
 			else

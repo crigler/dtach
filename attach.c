@@ -96,7 +96,7 @@ process_kbd(int s, struct packet *pkt)
 	{
 		/* Tell the master that we are suspending. */
 		pkt->type = MSG_DETACH;
-		write(s, pkt, sizeof(*pkt));
+		write(s, pkt, sizeof(struct packet));
 
 		/* And suspend... */
 		tcsetattr(0, TCSADRAIN, &orig_term);
@@ -106,8 +106,13 @@ process_kbd(int s, struct packet *pkt)
 
 		/* Tell the master that we are returning. */
 		pkt->type = MSG_ATTACH;
+		write(s, pkt, sizeof(struct packet));
+
+		/* We would like a redraw, too. */
+		pkt->type = MSG_REDRAW;
+		pkt->len = redraw_method;
 		ioctl(0, TIOCGWINSZ, &pkt->u.ws);
-		write(s, pkt, sizeof(*pkt));
+		write(s, pkt, sizeof(struct packet));
 		return;
 	}
 	/* Detach char? */
@@ -121,7 +126,7 @@ process_kbd(int s, struct packet *pkt)
 		win_changed = 1;
 
 	/* Push it out */
-	write(s, pkt, sizeof(*pkt));
+	write(s, pkt, sizeof(struct packet));
 }
 
 int
@@ -176,8 +181,13 @@ attach_main(int noerror)
 
 	/* Tell the master that we want to attach. */
 	pkt.type = MSG_ATTACH;
+	write(s, &pkt, sizeof(struct packet));
+
+	/* We would like a redraw, too. */
+	pkt.type = MSG_REDRAW;
+	pkt.len = redraw_method;
 	ioctl(0, TIOCGWINSZ, &pkt.u.ws);
-	write(s, &pkt, sizeof(pkt));
+	write(s, &pkt, sizeof(struct packet));
 
 	/* Wait for things to happen */
 	while (1)
