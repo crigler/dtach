@@ -182,19 +182,20 @@ attach_main(int noerror)
 	/* Wait for things to happen */
 	while (1)
 	{
+		int n;
+
 		FD_ZERO(&readfds);
 		FD_SET(0, &readfds);
 		FD_SET(s, &readfds);
-		if (select(s + 1, &readfds, NULL, NULL, NULL) < 0)
+		n = select(s + 1, &readfds, NULL, NULL, NULL);
+		if (n < 0 && errno != EINTR && errno != EAGAIN)
 		{
-			if (errno != EINTR && errno != EAGAIN)
-			{
-				printf(EOS "\r\n[select failed]\r\n");
-				exit(1);
-			}
+			printf(EOS "\r\n[select failed]\r\n");
+			exit(1);
 		}
+
 		/* Pty activity */
-		if (FD_ISSET(s, &readfds))
+		if (n > 0 && FD_ISSET(s, &readfds))
 		{
 			int len = read(s, buf, sizeof(buf));
 
@@ -211,9 +212,10 @@ attach_main(int noerror)
 			}
 			/* Send the data to the terminal. */
 			write(1, buf, len);
+			n--;
 		}
 		/* stdin activity */
-		if (FD_ISSET(0, &readfds))
+		if (n > 0 && FD_ISSET(0, &readfds))
 		{
 			pkt.type = MSG_PUSH;
 			memset(pkt.u.buf, 0, sizeof(pkt.u.buf));
@@ -222,7 +224,9 @@ attach_main(int noerror)
 			if (pkt.len <= 0)
 				exit(1);
 			process_kbd(s, &pkt);
+			n--;
 		}
+
 		/* Window size changed? */
 		if (win_changed)
 		{
