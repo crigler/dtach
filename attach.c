@@ -84,6 +84,7 @@ die(int sig)
 static RETSIGTYPE
 win_change()
 {
+	signal(SIGWINCH, win_change);
 	win_changed = 1;
 }
 
