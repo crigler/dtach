@@ -1,3 +1,5 @@
+1. INTRODUCTION
+
 dtach is a program written in C that emulates the detach feature of
 screen, which allows a program to be executed in an environment that is
 protected from the controlling terminal. For instance, the program under
@@ -5,26 +7,114 @@ the control of dtach would not be affected by the terminal being
 disconnected for some reason.
 
 dtach was written because screen did not adequately meet my needs; I did
-not need the other features of screen, such as its support of multiple
-terminals or its terminal emulation support. screen was also too big,
-bulky, and the source code was also difficult to understand.
+not need screen's extra features, such as support for multiple
+terminals or terminal emulation support. screen was also too big,
+bulky, and had source code that was difficult to understand.
 
 screen also interfered with my use of full-screen applications such as
-emacs and ircII, since screen excessively interprets the stream between
+emacs and ircII, due to its excessive interpretation of the stream between
 the program and the attached terminals. dtach does not have a terminal
 emulation layer, and passes the raw output stream of the program to the
-attached terminals. The input processing that dtach performs is
+attached terminals. The only input processing that dtach does perform is
 scanning for the detach character (which signals dtach to detach from
 the program) and processing the suspend key (which tells dtach to
-temporarily suspend itself without affecting the running program), which
-can both be disabled if desired.
+temporarily suspend itself without affecting the running program), and both
+of these can both be disabled if desired.
 
 Contrary to screen, dtach has minimal features, and is extremely tiny.
-The small size allows it to be more easily audited for bugs and security
-holes, and also allows it to fit in environments where space is limited,
+This allows dtach to be more easily audited for bugs and security
+holes, and makes it accessible in environments where space is limited,
 such as on rescue disks.
 
 dtach has only been tested on the Linux/x86 platform, however it should
 be easily portable to other variants of Unix. It currently assumes that
 the host system uses POSIX termios, and has a working forkpty function
 available.
+
+2. QUICK START
+
+Compiling dtach should be simple, as it uses autoconf:
+
+	$ ./configure
+	$ make
+
+If all goes well, a dtach binary should be built for your system. You can
+then copy it to the appropriate place on your system.
+
+dtach uses Unix-domain sockets to represent sessions; these are network
+sockets that are stored in the filesystem. You specify the name of the
+socket that dtach should use when creating or attaching to dtach sessions.
+
+For example, let's create a new session that is running ircII. We will use
+/tmp/foozle as the session's socket:
+
+	$ dtach -A /tmp/foozle irc RuneB irc.openprojects.net
+
+Here, -A tells dtach to either create a new session or attach to the
+existing session. If the session at /tmp/foozle does not exist yet, the
+program will be executed. If it does exist, then dtach will attach to
+the existing session.
+
+dtach has another attach mode, which is specified by using -a. The -a
+mode attaches to an already existing session, but will not create a
+new session. Each attaching process can have a separate detach character
+and suspend behavior, which are explained in the following sections.
+
+dtach is able to attach to the same session multiple times, though you
+will likely encounter problems if your terminals have different window
+sizes. Pressing ^L (Ctrl-L) will reset the window size of the program to
+match the current terminal.
+
+3. DETACHING FROM THE SESSION
+
+By default, dtach scans the keyboard input looking for the detach character.
+When the detach character is pressed, dtach will detach from the current
+session and exit, leaving the program running in the background. You can then
+re-attach to the program by running dtach again with -A or -a.
+
+The default detach character is ^\ (Ctrl-\). This can be changed by supplying
+the -e option to dtach when attaching. For example:
+
+	$ dtach -a /tmp/foozle -e '^A'
+
+That command would attach to the existing session at /tmp/foozle and use
+^A (Ctrl-A) as the detach character, instead of the default ^\.
+
+You can disable processing of the detach character by supplying the -E
+option to dtach when attaching.
+
+4. SUSPENDING DTACH
+
+By default, dtach also processes the suspend key (^Z or Ctrl-Z) itself,
+instead of passing it to the program. Thus, pressing suspend only suspends
+the attaching process, instead of the running program. This can be very
+useful for applications such as ircII, where you may not necessarily want
+the program to be suspended.
+
+Processing of the suspend key can be disabled by supplying the -z option
+to dtach when attaching.
+
+5. CHANGES
+
+The changes since version 0.3 are:
+- Slightly improved README and dtach.1
+
+The changes in version 0.3 are:
+- Fixed a typo in dtach.1
+- Changed the attach code so that it tells the master when a suspend
+  occurs.
+- Decreased the client <-> master packet size.
+- Changed the master to send a stream of text to attaching clients
+  instead of sending a huge packet all the time.
+- Use getrlimit and dynamically allocate the data structures, if
+  possible.
+- Added some more autoconf checks.
+- Initial sourceforge release.
+ 
+6. AUTHOR
+
+dtach is (C)Copyright 2001 Ned T. Crigler, and is under the GNU General
+Public License.
+
+Comments and suggestions about dtach are welcome, and can be sent to
+the author at: <crigler@hell-city.org>.

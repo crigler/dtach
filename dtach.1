@@ -23,7 +23,7 @@ works best with full-screen applications such as emacs.
 
 .B dtach
 is intended for users who want the detach feature of screen without the other
-overhead that screen has. It is tiny, does not use many libraries, and stays
+overhead of screen. It is tiny, does not use many libraries, and stays
 out of the way as much as possible.
 
 .SS SESSIONS
@@ -31,7 +31,7 @@ A session in
 .B dtach
 is a single instance in which a program is running under the control of
 .BR dtach .
-The program is dissasociated from the original terminal, and is thus protected
+The program is disassociated from the original terminal, and is thus protected
 from your original terminal being disconnected for some reason.
 .PP
 
@@ -59,13 +59,13 @@ attached terminals.
 .SS MODES
 .B dtach
 has several modes of operation. It can create a new session in which a
-program is executed, or it can attach to an already existing session. The first
+program is executed, or it can attach to an existing session. The first
 argument specifies which mode
 .B dtach
 should operate in.
 .TP
 .B \-a
-Attach to an already existing session.
+Attach to an existing session.
 .B dtach
 attaches itself to the session specified by
 .IR <socket> .
@@ -73,7 +73,7 @@ After the attach is completed, the window size of the current terminal is sent
 to the master process, and a redraw is also requested. 
 .TP
 .B \-A
-Attach to an already existing session, or create a new one.
+Attach to an existing session, or create a new one.
 .B dtach
 first tries to attach to the session specified by
 .I <socket>
