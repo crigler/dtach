@@ -1,6 +1,6 @@
 /*
     dtach - A simple program that emulates the detach feature of screen.
-    Copyright (C) 2001 Ned T. Crigler
+    Copyright (C) 2004 Ned T. Crigler
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#include "detach.h"
+#include "dtach.h"
 
 #ifndef VDISABLE
 #ifdef _POSIX_VDISABLE
@@ -33,8 +33,6 @@
 static struct termios cur_term;
 /* 1 if the window size changed */
 static int win_changed;
-/* 1 if we want a redraw */
-static int want_redraw;
 
 /* This hopefully moves to the bottom of the screen */
 #define EOS "\033[999H"
@@ -108,19 +106,15 @@ process_kbd(int s, struct packet *pkt)
 
 		/* Tell the master that we are returning. */
 		pkt->type = MSG_ATTACH;
+		ioctl(0, TIOCGWINSZ, &pkt->u.ws);
 		write(s, pkt, sizeof(*pkt));
-
-		/* The window size might have changed, and we definately want
-		** a redraw. We don't want to pass the suspend, though. */
-		win_changed = 1;
-		want_redraw = 1;
 		return;
 	}
 	/* Detach char? */
 	else if (pkt->u.buf[0] == detach_char)
 	{
 		printf(EOS "\r\n[detached]\r\n");
-		exit(1);
+		exit(0);
 	}
 	/* Just in case something pukes out. */
 	else if (pkt->u.buf[0] == '\f')
@@ -133,10 +127,10 @@ process_kbd(int s, struct packet *pkt)
 int
 attach_main(int noerror)
 {
-	int s;
-	struct pollfd polls[2];
 	struct packet pkt;
 	unsigned char buf[BUFSIZE];
+	fd_set readfds;
+	int s;
 
 	/* Attempt to open the socket. Don't display an error if noerror is 
 	** set. */
@@ -165,8 +159,9 @@ attach_main(int noerror)
 	signal(SIGQUIT, die);
 	signal(SIGWINCH, win_change);
 
-	/* Set raw mode, almost. We allow flow control to work, for instance. */
+	/* Set raw mode. */
 	cur_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
+	cur_term.c_iflag &= ~(IXON|IXOFF);
 	cur_term.c_oflag &= ~(OPOST);
 	cur_term.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
 	cur_term.c_cflag &= ~(CSIZE|PARENB);
@@ -174,41 +169,32 @@ attach_main(int noerror)
 	cur_term.c_cc[VLNEXT] = VDISABLE;
 	cur_term.c_cc[VMIN] = 1;
 	cur_term.c_cc[VTIME] = 0;
-
 	tcsetattr(0, TCSADRAIN, &cur_term);
 
 	/* Clear the screen. This assumes VT100. */
 	write(1, "\33[H\33[J", 6);
 
-	/* Set up the poll structures */
-	polls[0].fd = 0;
-	polls[0].events = POLLIN;
-	polls[0].revents = 0;
-	polls[1].fd = s;
-	polls[1].events = POLLIN;
-	polls[1].revents = 0;
-
-	/* Send our window size. */
-	pkt.type = MSG_WINCH;
+	/* Tell the master that we want to attach. */
+	pkt.type = MSG_ATTACH;
 	ioctl(0, TIOCGWINSZ, &pkt.u.ws);
-	write(s, &pkt, sizeof(pkt));
-	/* We would like a redraw, too. */
-	pkt.type = MSG_REDRAW;
 	write(s, &pkt, sizeof(pkt));
 
 	/* Wait for things to happen */
 	while (1)
 	{
-		if (poll(polls, 2, -1) < 0)
+		FD_ZERO(&readfds);
+		FD_SET(0, &readfds);
+		FD_SET(s, &readfds);
+		if (select(s + 1, &readfds, NULL, NULL, NULL) < 0)
 		{
 			if (errno != EINTR && errno != EAGAIN)
 			{
-				printf(EOS "\r\n[poll failed]\r\n");
+				printf(EOS "\r\n[select failed]\r\n");
 				exit(1);
 			}
 		}
 		/* Pty activity */
-		if (polls[1].revents != 0)
+		if (FD_ISSET(s, &readfds))
 		{
 			int len = read(s, buf, sizeof(buf));
 
@@ -216,7 +202,7 @@ attach_main(int noerror)
 			{
 				printf(EOS "\r\n[EOF - dtach terminating]"
 					"\r\n");
-				exit(1);
+				exit(0);
 			}
 			else if (len < 0)
 			{
@@ -227,7 +213,7 @@ attach_main(int noerror)
 			write(1, buf, len);
 		}
 		/* stdin activity */
-		if (polls[0].revents != 0)
+		if (FD_ISSET(0, &readfds))
 		{
 			pkt.type = MSG_PUSH;
 			memset(pkt.u.buf, 0, sizeof(pkt.u.buf));
@@ -244,14 +230,6 @@ attach_main(int noerror)
 
 			pkt.type = MSG_WINCH;
 			ioctl(0, TIOCGWINSZ, &pkt.u.ws);
-			write(s, &pkt, sizeof(pkt));
-		}
-		/* Want a redraw? */
-		if (want_redraw)
-		{
-			want_redraw = 0;
-
-			pkt.type = MSG_REDRAW;
 			write(s, &pkt, sizeof(pkt));
 		}
 	}

@@ -1,4 +1,4 @@
-.TH dtach 1 "November 2001" "dtach 0.5"
+.TH dtach 1 "May 2004" "dtach 0.6"
 .SH NAME
 dtach \- simple program that emulates the detach feature of screen.
 .SH SYNOPSIS
@@ -119,7 +119,7 @@ way to detach from the session is then by sending the attaching process an
 appropriate signal.
 .TP
 .B \-z
-Inhibits processing of the suspend key.
+Disables processing of the suspend key.
 Normally,
 .B dtach
 will suspend itself when the suspend key is pressed. With this option, the
@@ -146,8 +146,8 @@ Processing of the suspend character is also disabled for the attach instance.
 .fi
 
 .PP
-.SH AUTHORS
-Ned T. Crigler <crigler@hell-city.org>.
+.SH AUTHOR
+Ned T. Crigler <crigler@users.sourceforge.net>.
 
 .SH "SEE ALSO"
 .BR screen "(1)"

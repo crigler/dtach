@@ -1,6 +1,6 @@
 Summary: A simple program that emulates the detach feature of screen.
 Name: dtach
-Version: 0.5
+Version: 0.6
 Release: 1
 License: GPL
 URL: http://dtach.sourceforge.net

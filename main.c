@@ -1,6 +1,6 @@
 /*
     dtach - A simple program that emulates the detach feature of screen.
-    Copyright (C) 2001 Ned T. Crigler
+    Copyright (C) 2004 Ned T. Crigler
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,19 +16,16 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#include "detach.h"
+#include "dtach.h"
 
 /*
-** detach is a quick hack, since I wanted the detach feature of screen without
+** dtach is a quick hack, since I wanted the detach feature of screen without
 ** all the other crud. It'll work best with full-screen applications, as it
 ** does not keep track of the screen or anything like that.
 */
 
-/* The program version */
-#define VERSION "0.5"
-
 /* Make sure the binary has a copyright. */
-const char copyright[] = "dtach - version " VERSION " (C)Copyright 2001 Ned T. Crigler";
+const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004 Ned T. Crigler";
 
 /* argv[0] from the program */
 char *progname;
@@ -66,9 +63,9 @@ usage()
 		"  -e <char>\tSet the detach character to <char>, defaults "
 		"to ^\\.\n"
 		"  -E\t\tDisable the detach character.\n"
-		"  -z\t\tInhibit processing of the suspend key.\n"
-		"\nReport any bugs to <crigler@hell-city.org>.\n",
-		VERSION, __DATE__, __TIME__);
+		"  -z\t\tDisable processing of the suspend key.\n"
+		"\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
+		PACKAGE_VERSION, __DATE__, __TIME__);
 	exit(0);
 }
 
@@ -89,7 +86,7 @@ main(int argc, char **argv)
 		else if (strncmp(*argv, "--version", strlen(*argv)) == 0)
 		{
 			printf("dtach - version %s, compiled on %s at %s.\n",
-				VERSION, __DATE__, __TIME__);
+				PACKAGE_VERSION, __DATE__, __TIME__);
 			return 0;
 		}
 
@@ -100,7 +97,7 @@ main(int argc, char **argv)
 			 mode != 'A')
 		{
 			printf("%s: Invalid mode '-%c'\n", progname, mode);
-			printf("Try '%s -?' for more information.\n",
+			printf("Try '%s --help' for more information.\n",
 				progname);
 			return 1;
 		}
@@ -108,7 +105,7 @@ main(int argc, char **argv)
 	if (!mode)
 	{
 		printf("%s: No mode was specified.\n", progname);
-		printf("Try '%s -?' for more information.\n",
+		printf("Try '%s --help' for more information.\n",
 			progname);
 		return 1;
 	}
@@ -117,7 +114,7 @@ main(int argc, char **argv)
 	if (argc < 1)
 	{
 		printf("%s: No socket was specified.\n", progname);
-		printf("Try '%s -?' for more information.\n",
+		printf("Try '%s --help' for more information.\n",
 			progname);
 		return 1;
 	}
@@ -141,7 +138,7 @@ main(int argc, char **argv)
 				{
 					printf("%s: No escape character "
 						"specified.\n", progname);	
-					printf("Try '%s -?' for more "
+					printf("Try '%s --help' for more "
 						"information.\n", progname);
 					return 1;
 				}
@@ -160,7 +157,7 @@ main(int argc, char **argv)
 			{
 				printf("%s: Invalid option '-%c'\n",
 					progname, *p);
-				printf("Try '%s -?' for more information.\n",
+				printf("Try '%s --help' for more information.\n",
 					progname);
 				return 1;
 			}
@@ -171,7 +168,7 @@ main(int argc, char **argv)
 	if (mode != 'a' && argc < 1)
 	{
 		printf("%s: No command was specified.\n", progname);
-		printf("Try '%s -?' for more information.\n",
+		printf("Try '%s --help' for more information.\n",
 			progname);
 		return 1;
 	}
@@ -189,7 +186,7 @@ main(int argc, char **argv)
 		{
 			printf("%s: Invalid number of arguments.\n",
 				progname);
-			printf("Try '%s -?' for more information.\n",
+			printf("Try '%s --help' for more information.\n",
 				progname);
 			return 1;
 		}

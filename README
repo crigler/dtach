@@ -48,7 +48,7 @@ socket that dtach should use when creating or attaching to dtach sessions.
 For example, let's create a new session that is running ircII. We will use
 /tmp/foozle as the session's socket:
 
-	$ dtach -A /tmp/foozle irc RuneB irc.openprojects.net
+	$ dtach -A /tmp/foozle irc RuneB irc.freenode.net
 
 Here, -A tells dtach to either create a new session or attach to the
 existing session. If the session at /tmp/foozle does not exist yet, the
@@ -96,6 +96,16 @@ to dtach when attaching.
 
 5. CHANGES
 
+The changes in version 0.6 are:
+- Redraws are now handled by sending the child process a WINCH signal instead
+  of by sending a ^L character. This should help prevent line-oriented
+  programs (such as bash) from clearing the screen excessively.
+- Flow control is now disabled when setting raw mode on the terminal.
+- Switched to using select instead of poll.
+- Changed some exits to exit succesfully instead of non-sucessfully.
+- Updated my email address.
+- Updated to Autoconf 2.59, renaming some files in the process.
+
 The changes in version 0.5 are:
 - Fix fd leakage.
 - Prevent atexit from being called twice on dtach -A.
@@ -119,8 +129,8 @@ The changes in version 0.3 are:
  
 6. AUTHOR
 
-dtach is (C)Copyright 2001 Ned T. Crigler, and is under the GNU General
+dtach is (C)Copyright 2004 Ned T. Crigler, and is under the GNU General
 Public License.
 
 Comments and suggestions about dtach are welcome, and can be sent to
-the author at: <crigler@hell-city.org>.
+the author at: <crigler@users.sourceforge.net>.

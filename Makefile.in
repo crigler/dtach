@@ -3,7 +3,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@ -I.
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
-VERSION = 0.5
+VERSION = @PACKAGE_VERSION@
 VPATH = $(srcdir)
 
 OBJ = attach.o master.o main.o
@@ -29,7 +29,7 @@ tar:
 	gzip -9f dtach-$(VERSION).tar
 	rm -rf dtach-$(VERSION)
 
-attach.o: @srcdir@/attach.c @srcdir@/detach.h config.h
-master.o: @srcdir@/master.c @srcdir@/detach.h config.h
-main.o: @srcdir@/main.c @srcdir@/detach.h config.h
+attach.o: @srcdir@/attach.c @srcdir@/dtach.h config.h
+master.o: @srcdir@/master.c @srcdir@/dtach.h config.h
+main.o: @srcdir@/main.c @srcdir@/dtach.h config.h
 

@@ -1,6 +1,6 @@
 /*
     dtach - A simple program that emulates the detach feature of screen.
-    Copyright (C) 2001 Ned T. Crigler
+    Copyright (C) 2004 Ned T. Crigler
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#include "detach.h"
+#include "dtach.h"
 
 /* The pty struct - The pty information is stored here. */
 struct pty
@@ -27,6 +27,8 @@ struct pty
 	/* File descriptor of the slave side of the pty. For broken systems. */
 	int slave;
 #endif
+	/* Process id of the child. */
+	pid_t pid;
 	/* The terminal parameters of the pty. Old and new for comparision
 	** purposes. */
 	struct termios term;
@@ -34,17 +36,23 @@ struct pty
 	struct winsize ws;
 };
 
-/* The poll structures */
-static struct pollfd *polls;
-/* The number of active poll slots */
-static int num_polls;
-/* Boolean array for whether a particular connection is attached. */
-static int *attached;
-/* The highest file descriptor possible, as returned by getrlimit. */
-static int highest_fd;
+/* A connected client */
+struct client
+{
+	/* The next client in the linked list. */
+	struct client *next;
+	/* The previous client in the linked list. */
+	struct client **pprev;
+	/* File descriptor of the client. */
+	int fd;
+	/* Whether or not the client is attached. */
+	int attached;
+};
 
-/* The number of fixed slots in the poll structures */
-#define FIXED_SLOTS 2
+/* The list of connected clients. */
+static struct client *clients;
+/* The pseudo-terminal created for the child process. */
+static struct pty the_pty;
 
 #ifndef HAVE_FORKPTY
 pid_t forkpty(int *amaster, char *name, struct termios *termp,
@@ -67,7 +75,7 @@ die(int sig)
 	{
 #ifdef BROKEN_MASTER
 		/* Damn you Solaris! */
-		close(polls[1].fd);
+		close(the_pty.fd);
 #endif
 		return;
 	}
@@ -76,27 +84,20 @@ die(int sig)
 
 /* Initialize the pty structure. */
 static int
-init_pty(struct pty *pty, char **argv)
+init_pty(char **argv)
 {
-	pid_t pid;
-
 	/* Use the original terminal's settings. We don't have to set the
 	** window size here, because the attacher will send it in a packet. */
-	pty->term = orig_term;
+	the_pty.term = orig_term;
+	memset(&the_pty.ws, 0, sizeof(struct winsize));
 
 	/* Create the pty process */
-	pid = forkpty(&pty->fd, NULL, &pty->term, NULL);
-	if (pid < 0)
+	the_pty.pid = forkpty(&the_pty.fd, NULL, &the_pty.term, NULL);
+	if (the_pty.pid < 0)
 		return -1;
-	else if (pid == 0)
+	else if (the_pty.pid == 0)
 	{
-		int i;
-
-		/* Child.. Close some file descriptors and execute the
-		** program. */
-		for (i = highest_fd; i > 2; --i)
-			close(i);
-
+		/* Child.. Execute the program. */
 		execvp(*argv, argv);
 		exit(127);
 	}
@@ -105,8 +106,8 @@ init_pty(struct pty *pty, char **argv)
 	{
 		char *buf;
 
-		buf = ptsname(pty->fd);
-		pty->slave = open(buf, O_RDWR|O_NOCTTY);
+		buf = ptsname(the_pty.fd);
+		the_pty.slave = open(buf, O_RDWR|O_NOCTTY);
 	}
 #endif
 	return 0;
@@ -143,16 +144,17 @@ create_socket(char *name)
 	return s;
 }
 
-/* Process activity on a pty - Input and terminal changes are sent out to
+/* Process activity on the pty - Input and terminal changes are sent out to
 ** the attached clients. If the pty goes away, we die. */
 static void
-pty_activity(struct pty *pty)
+pty_activity()
 {
-	int i, len;
 	unsigned char buf[BUFSIZE];
+	struct client *p;
+	int len;
 
 	/* Read the pty activity */
-	len = read(pty->fd, buf, sizeof(buf));
+	len = read(the_pty.fd, buf, sizeof(buf));
 
 	/* Error -> die */
 	if (len <= 0)
@@ -160,19 +162,19 @@ pty_activity(struct pty *pty)
 
 #ifdef BROKEN_MASTER
 	/* Get the current terminal settings. */
-	if (tcgetattr(pty->slave, &pty->term) < 0)
+	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
 		exit(1);
 #else
 	/* Get the current terminal settings. */
-	if (tcgetattr(pty->fd, &pty->term) < 0)
+	if (tcgetattr(the_pty.fd, &the_pty.term) < 0)
 		exit(1);
 #endif
 
 	/* Send it out to the clients. */
-	for (i = FIXED_SLOTS; i < num_polls; ++i)
+	for (p = clients; p; p = p->next)
 	{
-		if (attached[polls[i].fd])
-			write(polls[i].fd, buf, len);
+		if (p->attached)
+			write(p->fd, buf, len);
 	}
 }
 
@@ -181,65 +183,75 @@ static void
 control_activity(int s)
 {
 	int fd;
+	struct client *p;
  
 	/* Accept the new client and link it in. */
-	fd = accept(s, 0, 0);
+	fd = accept(s, NULL, NULL);
 	if (fd < 0)
 		return;
 
 	/* Link it in. */
-	polls[num_polls].fd = fd;
-	polls[num_polls].events = POLLIN;
-	polls[num_polls].revents = 0;
-	attached[fd] = 1;
-	++num_polls;
+	p = malloc(sizeof(struct client));
+	p->fd = fd;
+	p->attached = 0;
+	p->pprev = &clients;
+	p->next = *(p->pprev);
+	if (p->next)
+		p->next->pprev = &p->next;
+	*(p->pprev) = p;
 }
 
 /* Process activity from a client. */
 static void
-client_activity(int i, struct pty *pty)
+client_activity(struct client *p)
 {
 	int len;
 	struct packet pkt;
 
 	/* Read the activity. */
-	len = read(polls[i].fd, &pkt, sizeof(pkt));
+	len = read(p->fd, &pkt, sizeof(pkt));
+	/* Close the client on an error. */
 	if (len <= 0)
 	{
-		/* Close the socket and go bye bye */
-		attached[polls[i].fd]=0;
-		close(polls[i].fd);
-		memcpy(polls + i, polls + i + 1, num_polls - i);
-		--num_polls;
+		close(p->fd);
+		if (p->next)
+			p->next->pprev = p->pprev;
+		*(p->pprev) = p->next;
+		free(p);
 		return;
 	} 
 
-	/* Okay, check the command byte. Push out data if we need to. */
+	/* Push out data to the program. */
 	if (pkt.type == MSG_PUSH)
-		write(pty->fd, pkt.u.buf, pkt.len);
-	/* Window size change. */
+		write(the_pty.fd, pkt.u.buf, pkt.len);
+
+	/* When attaching, we set the window size and force a redraw by sending
+	** the WINCH signal to the program.
+	**
+	** XXX: Are there any programs that don't handle the WINCH signal
+	** properly? Full-screen programs should fully redraw themselves, and
+	** line-oriented programs should redraw the prompt, or do nothing. 
+	*/
+	else if (pkt.type == MSG_ATTACH)
+	{
+		p->attached = 1;
+		if (memcmp(&the_pty.ws, &pkt.u.ws, sizeof(struct winsize)) != 0)
+		{
+			the_pty.ws = pkt.u.ws;
+			ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
+		}
+		else
+			kill(-the_pty.pid, SIGWINCH);
+	}
+	else if (pkt.type == MSG_DETACH)
+		p->attached = 0;
+
+	/* Window size change request, without a forced redraw. */
 	else if (pkt.type == MSG_WINCH)
 	{
-		pty->ws = pkt.u.ws;
-		ioctl(pty->fd, TIOCSWINSZ, &pty->ws);
+		the_pty.ws = pkt.u.ws;
+		ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
 	}
-	/* Redraw request? */
-	else if (pkt.type == MSG_REDRAW)
-	{
-		char c = '\f';
-
-		/* Guess that ^L might work under certain conditions. */
-		if (((pty->term.c_lflag & (ECHO|ICANON)) == 0) &&
-			(pty->term.c_cc[VMIN] == 1))
-		{
-			write(pty->fd, &c, sizeof(c));
-		}
-	}
-	/* Attach request? */
-	else if (pkt.type == MSG_ATTACH)
-		attached[polls[i].fd] = 1;
-	else if (pkt.type == MSG_DETACH)
-		attached[polls[i].fd] = 0;
 }
 
 /* The master process - It watches over the pty process and the attached */
@@ -247,35 +259,16 @@ client_activity(int i, struct pty *pty)
 static void
 master_process(int s, char **argv)
 {
-	struct pty pty;
-	int i;
-
-#ifdef HAVE_GETRLIMIT
-	struct rlimit rlim;
-
-	/* Dynamically allocate structures based on the number of file
-	** descriptors. */
-
-	if (getrlimit(RLIMIT_NOFILE, &rlim) < 0)
-	{	
-		printf("%s: getrlimit: %s\n", progname, strerror(errno));
-		exit(1);
-	}
-	highest_fd = rlim.rlim_cur;
-#else
-	/* We can't query the OS for the number of file descriptors, so
-	** we pull a number out of the air. */
-	highest_fd = 1024;
-#endif
-	polls = (struct pollfd*)malloc(highest_fd * sizeof(struct pollfd));
-	attached = (int*)malloc(highest_fd * sizeof(int));
+	struct client *p, *next;
+	fd_set readfds;
+	int highest_fd;
 
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
 	setsid();
 
 	/* Create a pty in which the process is running. */
-	if (init_pty(&pty, argv) < 0)
+	if (init_pty(argv) < 0)
 	{
 		printf("%s: init_pty: %s\n", progname, strerror(errno));
 		exit(1);
@@ -296,40 +289,46 @@ master_process(int s, char **argv)
 	fclose(stdout);
 	fclose(stderr);
 
-	/* Set a trap to unlink the socket when we die */
+	/* Set a trap to unlink the socket when we die. */
 	atexit(unlink_socket);
-
-	/* Set up the poll structures. Slot 0 is the control socket, slot 1
-	** is the pty, and slot 2 .. n is the connected clients. */
-	polls[0].fd = s;
-	polls[0].events = POLLIN;
-	polls[0].revents = 0;
-	polls[1].fd = pty.fd;
-	polls[1].events = POLLIN;
-	polls[1].revents = 0;
-	num_polls = FIXED_SLOTS;
 
 	/* Loop forever. */
 	while (1)
 	{
+		/* Re-initialize the file descriptor set for select. */
+		FD_ZERO(&readfds);
+		FD_SET(s, &readfds);
+		FD_SET(the_pty.fd, &readfds);
+		if (s > the_pty.fd)
+			highest_fd = s;
+		else
+			highest_fd = the_pty.fd;
+		for (p = clients; p; p = p->next)
+		{
+			FD_SET(p->fd, &readfds);
+			if (p->fd > highest_fd)
+				highest_fd = p->fd;
+		}
+
 		/* Wait for something to happen. */
-		if (poll(polls, num_polls, -1) < 0)
+		if (select(highest_fd + 1, &readfds, NULL, NULL, NULL) < 0)
 		{
 			if (errno == EINTR || errno == EAGAIN)
 				continue;
 			exit(1);
 		}	
 		/* pty activity? */
-		if (polls[1].revents != 0)
-			pty_activity(&pty);
+		if (FD_ISSET(the_pty.fd, &readfds))
+			pty_activity(&the_pty);
 		/* New client? */
-		if (polls[0].revents != 0)
+		if (FD_ISSET(s, &readfds))
 			control_activity(s);
 		/* Activity on a client? */
-		for (i = 2; i < num_polls; ++i)
+		for (p = clients; p; p = next)
 		{
-			if (polls[i].revents != 0)
-				client_activity(i, &pty);
+			next = p->next;
+			if (FD_ISSET(p->fd, &readfds))
+				client_activity(p);
 		}
 	}
 }
