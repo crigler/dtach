@@ -96,7 +96,7 @@ to dtach when attaching.
 
 5. CHANGES
 
-The changes since version 0.4 are:
+The changes in version 0.5 are:
 - Fix fd leakage.
 - Prevent atexit from being called twice on dtach -A.
 

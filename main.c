@@ -25,7 +25,7 @@
 */
 
 /* The program version */
-#define VERSION "0.4"
+#define VERSION "0.5"
 
 /* Make sure the binary has a copyright. */
 const char copyright[] = "dtach - version " VERSION " (C)Copyright 2001 Ned T. Crigler";

@@ -3,7 +3,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@ -I.
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
-VERSION = 0.4
+VERSION = 0.5
 VPATH = $(srcdir)
 
 OBJ = attach.o master.o main.o

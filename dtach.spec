@@ -1,6 +1,6 @@
 Summary: A simple program that emulates the detach feature of screen.
 Name: dtach
-Version: 0.4
+Version: 0.5
 Release: 1
 License: GPL
 URL: http://dtach.sourceforge.net
@@ -43,6 +43,10 @@ rm -rf $RPM_BUILD_DIR/%{name}-%{version}
 %{_mandir}/*/*
 
 %changelog
+* Fri Nov 30 2001 Ned T. Crigler <crigler@hell-city.org> 0.5
+- Fix fd leakage.
+- Prevent atexit from being called twice on dtach -A.
+
 * Fri Nov 30 2001 Trond Eivind Glomsrød <teg@redhat.com> 0.4-1
 - s/Copyright/License/
 - Minor description change
