@@ -96,6 +96,10 @@ to dtach when attaching.
 
 5. CHANGES
 
+The changes since version 0.4 are:
+- Fix fd leakage.
+- Prevent atexit from being called twice on dtach -A.
+
 The changes in version 0.4 are:
 - Slightly improved README and dtach.1
 - Portability updates thanks to sourceforge's compile farm. dtach should now

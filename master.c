@@ -125,12 +125,21 @@ create_socket(char *name)
 	sockun.sun_family = AF_UNIX;
 	strcpy(sockun.sun_path, name);
 	if (bind(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
+	{
+		close(s);
 		return -1;
+	}
 	if (listen(s, 128) < 0)
+	{
+		close(s);
 		return -1;
+	}
 	/* chmod it to prevent any suprises */
 	if (chmod(name, 0600) < 0)
+	{
+		close(s);
 		return -1;
+	}
 	return s;
 }
 
@@ -353,6 +362,7 @@ master_main(char **argv)
 		return 0;
 	}
 	/* Parent - just return. */
+	close(s);
 	return 0;
 }
 

@@ -63,7 +63,10 @@ connect_socket(char *name)
 	sockun.sun_family = AF_UNIX;
 	strcpy(sockun.sun_path, name);
 	if (connect(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
+	{
+		close(s);
 		return -1;
+	}
 	return s;
 }
 
@@ -135,6 +138,17 @@ attach_main(int noerror)
 	struct packet pkt;
 	unsigned char buf[BUFSIZE];
 
+	/* Attempt to open the socket. Don't display an error if noerror is 
+	** set. */
+	s = connect_socket(sockname);
+	if (s < 0)
+	{
+		if (!noerror)
+			printf("%s: %s: %s\n", progname, sockname,
+				strerror(errno));
+		return 1;
+	}
+
 	/* The current terminal settings are equal to the original terminal
 	** settings at this point. */
 	cur_term = orig_term;
@@ -150,17 +164,6 @@ attach_main(int noerror)
 	signal(SIGINT, die);
 	signal(SIGQUIT, die);
 	signal(SIGWINCH, win_change);
-
-	/* Attempt to open the socket. Don't display an error if noerror is 
-	** set. */
-	s = connect_socket(sockname);
-	if (s < 0)
-	{
-		if (!noerror)
-			printf("%s: %s: %s\n", progname, sockname,
-				strerror(errno));
-		return 1;
-	}
 
 	/* Set raw mode, almost. We allow flow control to work, for instance. */
 	cur_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
