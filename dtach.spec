@@ -3,7 +3,7 @@ Name: dtach
 Version: 0.3
 Release: 1
 Copyright: GPL
-URL: http://people.redhat.com/iweiner/dtach
+URL: http://dtach.sourceforge.net
 Group: Applications/System
 Source: dtach-%{version}.tar.gz
 Prefix: /usr
@@ -45,6 +45,9 @@ rm -rf $RPM_BUILD_DIR/%{name}-%{version}
 %{_mandir}/man1/*
 
 %changelog
+* Thu Sep 27 2001 Ned T. Crigler <crigler@hell-city.org>
+- Modified spec file URL: to point to http://dtach.sourceforge.net
+
 * Wed Sep 26 2001 Ned T. Crigler <crigler@hell-city.org> 0.3
 - Use getrlimit and dynamically allocate the data structures, if possible.
 - Added some more autoconf checks.
