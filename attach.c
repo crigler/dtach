@@ -44,7 +44,7 @@ restore_term(void)
 	tcsetattr(0, TCSADRAIN, &orig_term);
 
 	/* Make cursor visible. Assumes VT100. */
-	printf("\033[?25h\033[?0c");
+	printf("\033[?25h");
 	fflush(stdout);
 }
 
