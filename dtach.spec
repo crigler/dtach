@@ -1,6 +1,6 @@
 Summary: A simple program that emulates the detach feature of screen.
 Name: dtach
-Version: 0.3
+Version: 0.4
 Release: 1
 Copyright: GPL
 URL: http://dtach.sourceforge.net
@@ -45,6 +45,11 @@ rm -rf $RPM_BUILD_DIR/%{name}-%{version}
 %{_mandir}/man1/*
 
 %changelog
+* Sat Nov 03 2001 Ned T. Crigler <crigler@hell-city.org> 0.4
+- Portability updates thanks to sourceforge's compile farm. dtach should now
+  work on: FreeBSD, Debian/alpha, Debian/PPC, Debian/sparc, Debian/PPC, and
+  Solaris.
+
 * Thu Sep 27 2001 Ned T. Crigler <crigler@hell-city.org>
 - Modified spec file URL: to point to http://dtach.sourceforge.net
 

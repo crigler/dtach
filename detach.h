@@ -22,6 +22,7 @@
 #include "config.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,14 @@
 
 #ifdef HAVE_UTIL_H
 #include <util.h>
+#endif
+
+#ifdef HAVE_LIBUTIL_H
+#include <libutil.h>
+#endif
+
+#ifdef HAVE_STROPTS_H
+#include <stropts.h>
 #endif
 
 #ifdef HAVE_UNISTD_H
@@ -67,7 +76,7 @@ enum
 	MSG_DETACH
 };
 
-// The client to master protocol.
+/* The client to master protocol. */
 struct packet
 {
 	unsigned char type;
@@ -79,13 +88,19 @@ struct packet
 	} u;
 };
 
-// The master sends a simple stream of text to the attaching clients, without
-// any protocol. This might change back to the packet based protocol in the
-// future. In the meantime, however, we minimize the amount of data sent back
-// and forth between the client and the master. BUFSIZE is the size of the
-// buffer used for the text stream.
+/*
+** The master sends a simple stream of text to the attaching clients, without
+** any protocol. This might change back to the packet based protocol in the
+** future. In the meantime, however, we minimize the amount of data sent back
+** and forth between the client and the master. BUFSIZE is the size of the
+** buffer used for the text stream.
+*/
 #define BUFSIZE 4096
 
 int attach_main(int noerror);
 int master_main(char **argv);
+
+#ifdef sun
+#define BROKEN_MASTER
+#endif
 #endif

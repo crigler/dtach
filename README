@@ -96,8 +96,10 @@ to dtach when attaching.
 
 5. CHANGES
 
-The changes since version 0.3 are:
+The changes in version 0.4 are:
 - Slightly improved README and dtach.1
+- Portability updates thanks to sourceforge's compile farm. dtach should now
+  work on: FreeBSD, Debian/alpha, Debian/sparc, Debian/PPC, and Solaris.
 
 The changes in version 0.3 are:
 - Fixed a typo in dtach.1

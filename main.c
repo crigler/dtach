@@ -24,24 +24,26 @@
 ** does not keep track of the screen or anything like that.
 */
 
-// The program version
-#define VERSION "0.3"
+/* The program version */
+#define VERSION "0.4"
 
-// Make sure the binary has a copyright.
+/* Make sure the binary has a copyright. */
 const char copyright[] = "dtach - version " VERSION " (C)Copyright 2001 Ned T. Crigler";
 
-// argv[0] from the program
+/* argv[0] from the program */
 char *progname;
-// The name of the passed in socket.
+/* The name of the passed in socket. */
 char *sockname;
-// The character used for detaching. Defaults to '^\'
+/* The character used for detaching. Defaults to '^\' */
 int detach_char = '\\' - 64;
-// 1 if we should not interpret the suspend character.
+/* 1 if we should not interpret the suspend character. */
 int no_suspend;
 
-// The original terminal settings. Shared between the master and attach
-// processes. The master uses it to initialize the pty, and the attacher uses
-// it to restore the original settings.
+/*
+** The original terminal settings. Shared between the master and attach
+** processes. The master uses it to initialize the pty, and the attacher uses
+** it to restore the original settings.
+*/
 struct termios orig_term;
 
 static void
@@ -75,11 +77,11 @@ main(int argc, char **argv)
 {
 	int mode = 0;
 
-	// Save the program name
+	/* Save the program name */
 	progname = argv[0];
 	++argv; --argc;
 
-	// Parse the arguments
+	/* Parse the arguments */
 	if (argc >= 1 && **argv == '-')
 	{
 		if (strncmp(*argv, "--help", strlen(*argv)) == 0)
@@ -174,7 +176,7 @@ main(int argc, char **argv)
 		return 1;
 	}
 
-	// Save the original terminal settings.
+	/* Save the original terminal settings. */
 	if (tcgetattr(0, &orig_term) < 0)
 	{
 		printf("%s: tcgetattr: %s\n", progname, strerror(errno));
@@ -203,8 +205,8 @@ main(int argc, char **argv)
 	}
 	else if (mode == 'A')
 	{
-		// Try to attach first. If that doesn't work, create a new
-		// socket.
+		/* Try to attach first. If that doesn't work, create a new
+		** socket. */
 		if (attach_main(1) != 0)
 		{
 			if (master_main(argv) != 0)

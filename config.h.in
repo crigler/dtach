@@ -1,4 +1,4 @@
-/* config.h.in.  Generated automatically from configure.in by autoheader.  */
+/* config.h.in.  Generated from configure.in by autoheader.  */
 
 /* Define if you have the `forkpty' function. */
 #undef HAVE_FORKPTY
@@ -6,8 +6,29 @@
 /* Define if you have the `getrlimit' function. */
 #undef HAVE_GETRLIMIT
 
+/* Define if you have the `grantpt' function. */
+#undef HAVE_GRANTPT
+
+/* Define if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define if you have the `socket' library (-lsocket). */
+#undef HAVE_LIBSOCKET
+
 /* Define if you have the `util' library (-lutil). */
 #undef HAVE_LIBUTIL
+
+/* Define if you have the <libutil.h> header file. */
+#undef HAVE_LIBUTIL_H
+
+/* Define if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
+/* Define if you have the `openpty' function. */
+#undef HAVE_OPENPTY
+
+/* Define if you have the `ptsname' function. */
+#undef HAVE_PTSNAME
 
 /* Define if you have the <pty.h> header file. */
 #undef HAVE_PTY_H
@@ -15,8 +36,23 @@
 /* Define if you have the `socket' function. */
 #undef HAVE_SOCKET
 
+/* Define if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
 /* Define if you have the `strerror' function. */
 #undef HAVE_STRERROR
+
+/* Define if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define if you have the <stropts.h> header file. */
+#undef HAVE_STROPTS_H
 
 /* Define if you have the <sys/ioctl.h> header file. */
 #undef HAVE_SYS_IOCTL_H
@@ -24,11 +60,20 @@
 /* Define if you have the <sys/resource.h> header file. */
 #undef HAVE_SYS_RESOURCE_H
 
+/* Define if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
 /* Define if you have the <termios.h> header file. */
 #undef HAVE_TERMIOS_H
 
 /* Define if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
+
+/* Define if you have the `unlockpt' function. */
+#undef HAVE_UNLOCKPT
 
 /* Define if you have the <util.h> header file. */
 #undef HAVE_UTIL_H

@@ -1,9 +1,9 @@
 srcdir = @srcdir@
 CC = @CC@
-CFLAGS = -W -Wall -I. @CFLAGS@
+CFLAGS = @CFLAGS@ -I.
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
-VERSION = 0.3
+VERSION = 0.4
 VPATH = $(srcdir)
 
 OBJ = attach.o master.o main.o
@@ -14,10 +14,10 @@ TARFILES = $(srcdir)/README $(srcdir)/COPYING $(srcdir)/*.in $(srcdir)/*.c \
 	   $(srcdir)/dtach.1
 
 dtach: $(OBJ)
-	$(CC) -o $@ $(LDFLAGS) $^ $(LIBS)
+	$(CC) -o $@ $(LDFLAGS) $(OBJ) $(LIBS)
 
 clean:
-	rm -f .depend dtach $(OBJ) dtach-$(VERSION).tar.gz
+	rm -f dtach $(OBJ) dtach-$(VERSION).tar.gz
 
 distclean: clean
 	rm -f config.h Makefile config.log config.status config.cache
@@ -29,7 +29,7 @@ tar:
 	gzip -9f dtach-$(VERSION).tar
 	rm -rf dtach-$(VERSION)
 
-.depend:
-	@$(CC) $(CFLAGS) -MM $(SRC) > $@
+attach.o: @srcdir@/attach.c @srcdir@/detach.h config.h
+master.o: @srcdir@/master.c @srcdir@/detach.h config.h
+main.o: @srcdir@/main.c @srcdir@/detach.h config.h
 
--include .depend
