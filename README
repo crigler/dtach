@@ -56,9 +56,10 @@ program will be executed. If it does exist, then dtach will attach to
 the existing session.
 
 dtach has another attach mode, which is specified by using -a. The -a
-mode attaches to an already existing session, but will not create a
-new session. Each attaching process can have a separate detach character
-and suspend behavior, which are explained in the following sections.
+mode attaches to an already existing session, but will not create a new
+session. Each attaching process can have a separate detach character,
+suspend behavior, and redraw method, which are explained in the
+following sections.
 
 dtach is able to attach to the same session multiple times, though you
 will likely encounter problems if your terminals have different window
@@ -94,7 +95,34 @@ the program to be suspended.
 Processing of the suspend key can be disabled by supplying the -z option
 to dtach when attaching.
 
-5. CHANGES
+5. REDRAW METHOD
+
+When attaching, dtach can use one of three methods to redraw the screen
+(none, ctrl_l, or winch). By default, dtach uses the ctrl_l method,
+which simply sends a ^L (Ctrl-L) character to the program if the
+terminal is in character-at-a-time and no-echo mode. The winch method
+forces a WINCH signal to be sent to the program, and the none method
+disables redrawing completely.
+
+For example, this command tells dtach to attach to a session at
+/tmp/foozle and use the winch redraw method:
+
+	$ dtach -a /tmp/foozle -r winch
+
+When creating a new session (with the -c or -A modes), the specified
+method is used as the default redraw method for the session.
+
+6. CHANGES
+
+The changes in version 0.7 are:
+- The redraw method can now be explicitly specified on the command line
+  (either no redraw at all, the old ^L character method, and the new WINCH
+  signal method), since many programs only handle one or the other properly.
+- Changed the default redraw method back to the old ^L character method.
+- Changed the attach code to check the return value of select more carefully.
+- Changed the SIGWINCH handler to reinstall itself, to handle systems that
+  always reset the handler.
+- Added more proper process group handling.
 
 The changes in version 0.6 are:
 - Redraws are now handled by sending the child process a WINCH signal instead
@@ -127,7 +155,7 @@ The changes in version 0.3 are:
 - Added some more autoconf checks.
 - Initial sourceforge release.
  
-6. AUTHOR
+7. AUTHOR
 
 dtach is (C)Copyright 2004 Ned T. Crigler, and is under the GNU General
 Public License.
