@@ -1,0 +1,153 @@
+.TH dtach 1 "September 2001" "dtach 0.3"
+.SH NAME
+dtach \- simple program that emulates the detach feature of screen.
+.SH SYNOPSIS
+.B dtach -a
+.I <socket> <options>
+.br
+.B dtach -A
+.I <socket> <options> <command...>
+.br
+.B dtach -c
+.I <socket> <options> <command...>
+.br
+.B dtach -n
+.I <socket> <options> <command...>
+
+.SH DESCRIPTION
+.B dtach
+is a program that emulates the detach feature of screen. It is designed
+to be transparent and un-intrusive; it avoids interpreting the input and output
+between attached terminals and the program under its control. Consequently, it
+works best with full-screen applications such as emacs.
+
+.B dtach
+is intended for users who want the detach feature of screen without the other
+overhead that screen has. It is tiny, does not use many libraries, and stays
+out of the way as much as possible.
+
+.SS SESSIONS
+A session in
+.B dtach
+is a single instance in which a program is running under the control of
+.BR dtach .
+The program is dissasociated from the original terminal, and is thus protected
+from your original terminal being disconnected for some reason.
+.PP
+
+Other instances of 
+.B dtach
+can attach themselves to a particular session. Input and output is copied
+between the program running in the
+.B dtach
+session, and the attached terminals.
+.PP
+
+.B dtach
+avoids interpreting the communication stream between the program and the
+attached terminals; it instead relies on the ability of the attached terminals
+to manage the screen.
+.PP
+
+Sessions are represented by Unix-domain sockets in the filesystem. No other
+permission checking other than the filesystem access checks is performed.
+.B dtach
+creates a master process that monitors the session socket, the program, and any
+attached terminals.
+
+.PP
+.SS MODES
+.B dtach
+has several modes of operation. It can create a new session in which a
+program is executed, or it can attach to an already existing session. The first
+argument specifies which mode
+.B dtach
+should operate in.
+.TP
+.B \-a
+Attach to an already existing session.
+.B dtach
+attaches itself to the session specified by
+.IR <socket> .
+After the attach is completed, the window size of the current terminal is sent
+to the master process, and a redraw is also requested. 
+.TP
+.B \-A
+Attach to an already existing session, or create a new one.
+.B dtach
+first tries to attach to the session specified by
+.I <socket>
+if possible. If the attempt to open the socket fails,
+.B dtach
+tries to create a new session before attaching to it.
+.TP
+.B \-c
+Creates a new session. A new session is created in which the specified program
+is executed.
+.B dtach
+then tries to attach itself to the newly created session.
+.TP
+.B \-n
+Creates a new session, without attaching to it. A new session is created in
+which the specified program is executed.
+.B dtach
+does not try to attach to the newly created session, however, and exits
+instead.
+
+.PP
+.SS OPTIONS
+.B dtach
+has a few options that allow you to modify its behavior. Each attaching
+process can have separate settings for these options, which allows for
+some flexibility.
+
+.TP
+.BI "\-e " "<char>"
+Sets the detach character to
+.IR <char> .
+When the detach character is pressed,
+.B dtach
+detaches itself from the current session and exits. The process running in
+the session is unaffected by the detach. By default, the detach character is
+set to ^\\ (Ctrl-\\).
+.TP
+.B \-E
+Disables the detach character.
+.B dtach
+does not try to scan input from the terminal for a detach character. The only
+way to detach from the session is then by sending the attaching process an
+appropriate signal.
+.TP
+.B \-z
+Inhibits processing of the suspend key.
+Normally,
+.B dtach
+will suspend itself when the suspend key is pressed. With this option, the
+suspend character is sent to the session instead of being handled by
+.BR dtach .
+
+.PP
+.SH EXAMPLES
+
+The following example creates a new session that has the detach character
+and suspend processing disabled. A socket is created in the /tmp directory
+for the session.
+
+.nf
+   $ dtach -c /tmp/foozle -Ez bash
+.fi
+
+The following example attaches to the /tmp/foozle session if it exists, and if
+not, creates a new session using /tmp/foozle as the socket for the session.
+Processing of the suspend character is also disabled for the attach instance.
+
+.nf
+   $ dtach -A /tmp/foozle -z bash
+.fi
+
+.PP
+.SH AUTHORS
+Ned T. Crigler <crigler@hell-city.org>.
+
+.SH "SEE ALSO"
+.BR screen "(1)"

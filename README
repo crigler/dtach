@@ -1,0 +1,30 @@
+dtach is a program written in C that emulates the detach feature of
+screen, which allows a program to be executed in an environment that is
+protected from the controlling terminal. For instance, the program under
+the control of dtach would not be affected by the terminal being
+disconnected for some reason.
+
+dtach was written because screen did not adequately meet my needs; I did
+not need the other features of screen, such as its support of multiple
+terminals or its terminal emulation support. screen was also too big,
+bulky, and the source code was also difficult to understand.
+
+screen also interfered with my use of full-screen applications such as
+emacs and ircII, since screen excessively interprets the stream between
+the program and the attached terminals. dtach does not have a terminal
+emulation layer, and passes the raw output stream of the program to the
+attached terminals. The input processing that dtach performs is
+scanning for the detach character (which signals dtach to detach from
+the program) and processing the suspend key (which tells dtach to
+temporarily suspend itself without affecting the running program), which
+can both be disabled if desired.
+
+Contrary to screen, dtach has minimal features, and is extremely tiny.
+The small size allows it to be more easily audited for bugs and security
+holes, and also allows it to fit in environments where space is limited,
+such as on rescue disks.
+
+dtach has only been tested on the Linux/x86 platform, however it should
+be easily portable to other variants of Unix. It currently assumes that
+the host system uses POSIX termios, and has a working forkpty function
+available.
