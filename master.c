@@ -144,6 +144,28 @@ create_socket(char *name)
 	return s;
 }
 
+/* Sets a file descriptor to non-blocking mode. */
+static int
+setnonblocking(int fd)
+{
+	int flags;
+
+#if defined(O_NONBLOCK)
+	flags = fcntl(fd, F_GETFL);
+	if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+		return -1;
+	return 0;
+#elif defined(FIONBIO)
+	flags = 1;
+	if (ioctl(fd, FIONBIO, &flags) < 0)
+		return -1;
+	return 0;
+#else
+#warning Do not know how to set non-blocking mode.
+	return 0;
+#endif
+}
+
 /* Process activity on the pty - Input and terminal changes are sent out to
 ** the attached clients. If the pty goes away, we die. */
 static void
@@ -187,7 +209,7 @@ control_activity(int s)
  
 	/* Accept the new client and link it in. */
 	fd = accept(s, NULL, NULL);
-	if (fd < 0)
+	if (fd < 0 || setnonblocking(fd) < 0)
 		return;
 
 	/* Link it in. */
