@@ -201,6 +201,35 @@ control_activity(int s)
 	*(p->pprev) = p;
 }
 
+/* Send a signal to the slave side of a pseudo-terminal. */
+static void
+killpty(struct pty *pty, int sig)
+{
+	pid_t pgrp = -1;
+
+#ifdef TIOCSIGNAL
+	if (ioctl(pty->fd, TIOCSIGNAL, sig) >= 0)
+		return;
+#endif
+#ifdef TIOCSIG
+	if (ioctl(pty->fd, TIOCSIG, sig) >= 0)
+		return;
+#endif
+#ifdef TIOCGPGRP
+#ifdef BROKEN_MASTER
+	if (ioctl(pty->slave, TIOCGPGRP, &pgrp) >= 0 && pgrp != -1 &&
+		kill(-pgrp, sig) >= 0)
+		return;
+#endif
+	if (ioctl(pty->fd, TIOCGPGRP, &pgrp) >= 0 && pgrp != -1 &&
+		kill(-pgrp, sig) >= 0)
+		return;
+#endif
+
+	/* Fallback using the child's pid. */
+	kill(-pty->pid, sig);
+}
+
 /* Process activity from a client. */
 static void
 client_activity(struct client *p)
@@ -241,7 +270,7 @@ client_activity(struct client *p)
 			ioctl(the_pty.fd, TIOCSWINSZ, &the_pty.ws);
 		}
 		else
-			kill(-the_pty.pid, SIGWINCH);
+			killpty(&the_pty, SIGWINCH);
 	}
 	else if (pkt.type == MSG_DETACH)
 		p->attached = 0;
