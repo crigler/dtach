@@ -2,16 +2,16 @@
 .SH NAME
 dtach \- simple program that emulates the detach feature of screen.
 .SH SYNOPSIS
-.B dtach -a
+.B dtach \-a
 .I <socket> <options>
 .br
-.B dtach -A
+.B dtach \-A
 .I <socket> <options> <command...>
 .br
-.B dtach -c
+.B dtach \-c
 .I <socket> <options> <command...>
 .br
-.B dtach -n
+.B dtach \-n
 .I <socket> <options> <command...>
 
 .SH DESCRIPTION
@@ -159,7 +159,7 @@ and suspend processing disabled. A socket is created in the /tmp directory
 for the session.
 
 .nf
-   $ dtach -c /tmp/foozle -Ez bash
+   $ dtach \-c /tmp/foozle \-Ez bash
 .fi
 
 The following example attaches to the /tmp/foozle session if it exists, and if
@@ -167,7 +167,7 @@ not, creates a new session using /tmp/foozle as the socket for the session.
 Processing of the suspend character is also disabled for the attach instance.
 
 .nf
-   $ dtach -A /tmp/foozle -z bash
+   $ dtach \-A /tmp/foozle \-z bash
 .fi
 
 The following example attaches to the /tmp/foozle session, using the
@@ -175,7 +175,7 @@ The following example attaches to the /tmp/foozle session, using the
 redraw method to redraw the screen.
 
 .nf
-   $ dtach -a /tmp/foozle -r winch
+   $ dtach \-a /tmp/foozle \-r winch
 .fi
 
 The following example creates a new session and sets the default redraw method
@@ -184,7 +184,7 @@ for the session to the
 redraw method.
 
 .nf
-   $ dtach -c /tmp/foozle -r winch bash
+   $ dtach \-c /tmp/foozle \-r winch bash
 .fi
 
 .PP
