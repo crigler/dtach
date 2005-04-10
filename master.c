@@ -114,7 +114,10 @@ init_pty(char **argv)
 	memset(&the_pty.ws, 0, sizeof(struct winsize));
 
 	/* Create the pty process */
-	the_pty.pid = forkpty(&the_pty.fd, NULL, &the_pty.term, NULL);
+	if (!dont_have_tty)
+		the_pty.pid = forkpty(&the_pty.fd, NULL, &the_pty.term, NULL);
+	else
+		the_pty.pid = forkpty(&the_pty.fd, NULL, NULL, NULL);
 	if (the_pty.pid < 0)
 		return -1;
 	else if (the_pty.pid == 0)

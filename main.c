@@ -44,6 +44,7 @@ int redraw_method = REDRAW_UNSPEC;
 ** it to restore the original settings.
 */
 struct termios orig_term;
+int dont_have_tty;
 
 static void
 usage()
@@ -210,10 +211,25 @@ main(int argc, char **argv)
 	/* Save the original terminal settings. */
 	if (tcgetattr(0, &orig_term) < 0)
 	{
-		printf("%s: tcgetattr: %s\n", progname, strerror(errno));
-		return 1;
+		if (errno == ENOTTY)
+		{
+			memset(&orig_term, 0, sizeof(struct termios));
+			dont_have_tty = 1;
+		}
+		else
+		{
+			printf("%s: tcgetattr: %s\n", progname,
+				strerror(errno));
+			return 1;
+		}
 	}
 
+	if (dont_have_tty && mode != 'n')
+	{
+		printf("%s: Attaching to a session requires a terminal.\n",
+			progname);
+		return 1;
+	}
 	if (mode == 'a')
 	{
 		if (argc > 0)
