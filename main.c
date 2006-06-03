@@ -243,10 +243,10 @@ main(int argc, char **argv)
 		return attach_main(0);
 	}
 	else if (mode == 'n')
-		return master_main(argv);
+		return master_main(argv, 0);
 	else if (mode == 'c')
 	{
-		if (master_main(argv) != 0)
+		if (master_main(argv, 1) != 0)
 			return 1;
 		return attach_main(0);
 	}
@@ -256,7 +256,7 @@ main(int argc, char **argv)
 		** socket. */
 		if (attach_main(1) != 0)
 		{
-			if (master_main(argv) != 0)
+			if (master_main(argv, 1) != 0)
 				return 1;
 			return attach_main(0);
 		}

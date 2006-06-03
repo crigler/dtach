@@ -34,9 +34,6 @@ static struct termios cur_term;
 /* 1 if the window size changed */
 static int win_changed;
 
-/* This hopefully moves to the bottom of the screen */
-#define EOS "\033[999H"
-
 /* Restores the original terminal settings. */
 static void
 restore_term(void)

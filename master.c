@@ -124,6 +124,8 @@ init_pty(char **argv)
 	{
 		/* Child.. Execute the program. */
 		execvp(*argv, argv);
+		printf(EOS "\r\n%s: could not execute %s: %s\r\n",
+		       progname, *argv, strerror(errno));
 		exit(127);
 	}
 	/* Parent.. Finish up and return */
@@ -394,7 +396,7 @@ client_activity(struct client *p)
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static void
-master_process(int s, char **argv)
+master_process(int s, char **argv, int waitattach)
 {
 	struct client *p, *next;
 	fd_set readfds;
@@ -440,11 +442,17 @@ master_process(int s, char **argv)
 		/* Re-initialize the file descriptor set for select. */
 		FD_ZERO(&readfds);
 		FD_SET(s, &readfds);
-		FD_SET(the_pty.fd, &readfds);
-		if (s > the_pty.fd)
-			highest_fd = s;
-		else
-			highest_fd = the_pty.fd;
+		highest_fd = s;
+
+		if (clients && clients->attached)
+			waitattach = 0;
+		if (!waitattach)
+		{
+			FD_SET(the_pty.fd, &readfds);
+			if (the_pty.fd > highest_fd)
+				highest_fd = the_pty.fd;
+		}
+
 		for (p = clients; p; p = p->next)
 		{
 			FD_SET(p->fd, &readfds);
@@ -458,10 +466,8 @@ master_process(int s, char **argv)
 			if (errno == EINTR || errno == EAGAIN)
 				continue;
 			exit(1);
-		}	
-		/* pty activity? */
-		if (FD_ISSET(the_pty.fd, &readfds))
-			pty_activity(s);
+		}
+
 		/* New client? */
 		if (FD_ISSET(s, &readfds))
 			control_activity(s);
@@ -472,11 +478,14 @@ master_process(int s, char **argv)
 			if (FD_ISSET(p->fd, &readfds))
 				client_activity(p);
 		}
+		/* pty activity? */
+		if (FD_ISSET(the_pty.fd, &readfds))
+			pty_activity(s);
 	}
 }
 
 int
-master_main(char **argv)
+master_main(char **argv, int waitattach)
 {
 	int s;
 	pid_t pid;
@@ -503,7 +512,7 @@ master_main(char **argv)
 	else if (pid == 0)
 	{
 		/* Child - this becomes the master */
-		master_process(s, argv);
+		master_process(s, argv, waitattach);
 		return 0;
 	}
 	/* Parent - just return. */
