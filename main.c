@@ -256,8 +256,13 @@ main(int argc, char **argv)
 		** socket. */
 		if (attach_main(1) != 0)
 		{
-			if (master_main(argv, 1) != 0)
-				return 1;
+			if (errno == ECONNREFUSED || errno == ENOENT)
+			{
+				if (errno == ECONNREFUSED)
+					unlink(sockname);
+				if (master_main(argv, 1) != 0)
+					return 1;
+			}
 			return attach_main(0);
 		}
 	}

@@ -73,6 +73,14 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#ifndef S_ISREG
+#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+
+#ifndef S_ISSOCK
+#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#endif
+
 extern char *progname, *sockname;
 extern int detach_char, no_suspend, redraw_method;
 extern struct termios orig_term;

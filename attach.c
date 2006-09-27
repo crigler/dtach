@@ -60,6 +60,18 @@ connect_socket(char *name)
 	if (connect(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
 	{
 		close(s);
+
+		/* ECONNREFUSED is also returned for regular files, so make
+		** sure we are trying to connect to a socket. */
+		if (errno == ECONNREFUSED)
+		{
+			struct stat st;
+
+			if (stat(name, &st) < 0)
+				return -1;
+			else if (!S_ISSOCK(st.st_mode) || S_ISREG(st.st_mode))
+				errno = ENOTSOCK;
+		}
 		return -1;
 	}
 	return s;
