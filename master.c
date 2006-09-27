@@ -444,9 +444,16 @@ master_process(int s, char **argv, int waitattach)
 		FD_SET(s, &readfds);
 		highest_fd = s;
 
-		if (clients && clients->attached)
-			waitattach = 0;
-		if (!waitattach)
+		/*
+		** When waitattach is set, wait until the client attaches
+		** before trying to read from the pty.
+		*/
+		if (waitattach)
+		{
+			if (clients && clients->attached)
+				waitattach = 0;
+		}
+		else
 		{
 			FD_SET(the_pty.fd, &readfds);
 			if (the_pty.fd > highest_fd)
