@@ -211,17 +211,8 @@ main(int argc, char **argv)
 	/* Save the original terminal settings. */
 	if (tcgetattr(0, &orig_term) < 0)
 	{
-		if (errno == ENOTTY)
-		{
-			memset(&orig_term, 0, sizeof(struct termios));
-			dont_have_tty = 1;
-		}
-		else
-		{
-			printf("%s: tcgetattr: %s\n", progname,
-				strerror(errno));
-			return 1;
-		}
+		memset(&orig_term, 0, sizeof(struct termios));
+		dont_have_tty = 1;
 	}
 
 	if (dont_have_tty && mode != 'n')
@@ -230,6 +221,7 @@ main(int argc, char **argv)
 			progname);
 		return 1;
 	}
+
 	if (mode == 'a')
 	{
 		if (argc > 0)
