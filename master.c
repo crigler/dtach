@@ -106,7 +106,7 @@ setnonblocking(int fd)
 
 /* Initialize the pty structure. */
 static int
-init_pty(char **argv)
+init_pty(char **argv, int statusfd)
 {
 	/* Use the original terminal's settings. We don't have to set the
 	** window size here, because the attacher will send it in a packet. */
@@ -124,9 +124,18 @@ init_pty(char **argv)
 	{
 		/* Child.. Execute the program. */
 		execvp(*argv, argv);
-		printf(EOS "\r\n%s: could not execute %s: %s\r\n",
-		       progname, *argv, strerror(errno));
-		exit(127);
+
+		/* Report the error to statusfd if we can, or stdout if we
+		** can't. */
+		if (statusfd != -1)
+			dup2(statusfd, 1);
+		else
+			printf(EOS "\r\n");
+
+		printf("%s: could not execute %s: %s\r\n", progname,
+		       *argv, strerror(errno));
+		fflush(stdout);
+		_exit(127);
 	}
 	/* Parent.. Finish up and return */
 #ifdef BROKEN_MASTER
@@ -396,7 +405,7 @@ client_activity(struct client *p)
 /* The master process - It watches over the pty process and the attached */
 /* clients. */
 static void
-master_process(int s, char **argv, int waitattach)
+master_process(int s, char **argv, int waitattach, int statusfd)
 {
 	struct client *p, *next;
 	fd_set readfds;
@@ -407,12 +416,8 @@ master_process(int s, char **argv, int waitattach)
 	** don't care what happens to it. */
 	setsid();
 
-	/* Create a pty in which the process is running. */
-	if (init_pty(argv) < 0)
-	{
-		printf("%s: init_pty: %s\n", progname, strerror(errno));
-		exit(1);
-	}
+	/* Set a trap to unlink the socket when we die. */
+	atexit(unlink_socket);
 
 	/* Set up some signals. */
 	signal(SIGPIPE, SIG_IGN);
@@ -424,6 +429,19 @@ master_process(int s, char **argv, int waitattach)
 	signal(SIGTERM, die);
 	signal(SIGCHLD, die);
 
+	/* Create a pty in which the process is running. */
+	if (init_pty(argv, statusfd) < 0)
+	{
+		if (statusfd != -1)
+			dup2(statusfd, 1);
+		printf("%s: init_pty: %s\n", progname, strerror(errno));
+		exit(1);
+	}
+	
+	/* Close statusfd, since we don't need it anymore. */
+	if (statusfd != -1)
+		close(statusfd);
+
 	/* Make sure stdin/stdout/stderr point to /dev/null. We are now a
 	** daemon. */
 	nullfd = open("/dev/null", O_RDWR);
@@ -432,9 +450,6 @@ master_process(int s, char **argv, int waitattach)
 	dup2(nullfd, 2);
 	if (nullfd > 2)
 		close(nullfd);
-
-	/* Set a trap to unlink the socket when we die. */
-	atexit(unlink_socket);
 
 	/* Loop forever. */
 	while (1)
@@ -494,6 +509,7 @@ master_process(int s, char **argv, int waitattach)
 int
 master_main(char **argv, int waitattach)
 {
+	int fd[2] = {-1, -1};
 	int s;
 	pid_t pid;
 
@@ -509,20 +525,59 @@ master_main(char **argv, int waitattach)
 		return 1;
 	}
 
+#if defined(F_SETFD) && defined(FD_CLOEXEC)
+	fcntl(s, F_SETFD, FD_CLOEXEC);
+
+	/* If FD_CLOEXEC works, create a pipe and use it to report any errors
+	** that occur while trying to execute the program. */
+	if (pipe(fd) >= 0)
+	{
+		if (fcntl(fd[0], F_SETFD, FD_CLOEXEC) < 0 ||
+		    fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)
+		{
+			close(fd[0]);
+			close(fd[1]);
+			fd[0] = fd[1] = -1;
+		}
+	}
+#endif
+
 	/* Fork off so we can daemonize and such */
 	pid = fork();
 	if (pid < 0)
 	{
 		printf("%s: fork: %s\n", progname, strerror(errno));
+		unlink_socket();
 		return 1;
 	}
 	else if (pid == 0)
 	{
 		/* Child - this becomes the master */
-		master_process(s, argv, waitattach);
+		if (fd[0] != -1)
+			close(fd[0]);
+		master_process(s, argv, waitattach, fd[1]);
 		return 0;
 	}
 	/* Parent - just return. */
+
+#if defined(F_SETFD) && defined(FD_CLOEXEC)
+	/* Check if an error occurred while trying to execute the program. */
+	if (fd[0] != -1)
+	{
+		char buf[1024];
+		int len;
+
+		close(fd[1]);
+		len = read(fd[0], buf, sizeof(buf));
+		if (len > 0)
+		{
+			write(2, buf, len);
+			kill(pid, SIGTERM);
+			return 1;
+		}
+		close(fd[0]);
+	}
+#endif
 	close(s);
 	return 0;
 }
