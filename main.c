@@ -1,6 +1,6 @@
 /*
     dtach - A simple program that emulates the detach feature of screen.
-    Copyright (C) 2004 Ned T. Crigler
+    Copyright (C) 2004-2008 Ned T. Crigler
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 */
 
 /* Make sure the binary has a copyright. */
-const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004 Ned T. Crigler";
+const char copyright[] = "dtach - version " PACKAGE_VERSION "(C)Copyright 2004-2008 Ned T. Crigler";
 
 /* argv[0] from the program */
 char *progname;

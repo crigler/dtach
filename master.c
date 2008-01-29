@@ -1,6 +1,6 @@
 /*
     dtach - A simple program that emulates the detach feature of screen.
-    Copyright (C) 2004 Ned T. Crigler
+    Copyright (C) 2004-2008 Ned T. Crigler
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
