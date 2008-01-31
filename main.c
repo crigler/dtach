@@ -155,7 +155,7 @@ main(int argc, char **argv)
 					if (argv[0][1] == '?')
 						detach_char = '\177';
 					else
-						detach_char = argv[0][1] - 64;
+						detach_char = argv[0][1] & 037;
 				}
 				else
 					detach_char = argv[0][0];
