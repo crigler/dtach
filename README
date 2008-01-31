@@ -114,6 +114,23 @@ method is used as the default redraw method for the session.
 
 6. CHANGES
 
+The changes in version 0.8 are:
+- When using dtach -A or dtach -c, the master will now wait until the client
+  attaches before trying to read from the program being executed. This avoids
+  a race condition when the program prints something and exits before the
+  client can attach itself.
+- Instead of exiting quietly, dtach will now report any errors that occur
+  while trying to execute the program.
+- dtach -n can now be used without a terminal.
+- dtach -A will now try to detect and remove stale sockets.
+- Removed a Linux-specific escape sequence from the code that restores the
+  original terminal settings.
+- Changed dtach.1 to use \- for the dashes in command line options, and
+  fix an ambiguous backslash.
+- Use non-blocking mode in the master process, and avoid data loss by ensuring
+  that at least one attaching client succesfully completes a write.
+- Fix -e ^<char> to work with lowercase characters.
+
 The changes in version 0.7 are:
 - The redraw method can now be explicitly specified on the command line
   (either no redraw at all, the old ^L character method, and the new WINCH
