@@ -217,7 +217,7 @@ attach_main(int noerror)
 		/* Pty activity */
 		if (n > 0 && FD_ISSET(s, &readfds))
 		{
-			int len = read(s, buf, sizeof(buf));
+			ssize_t len = read(s, buf, sizeof(buf));
 
 			if (len == 0)
 			{

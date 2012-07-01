@@ -220,7 +220,7 @@ static void
 pty_activity(int s)
 {
 	unsigned char buf[BUFSIZE];
-	int len;
+	ssize_t len;
 	struct client *p;
 	fd_set readfds, writefds;
 	int highest_fd, nclients;
@@ -268,7 +268,7 @@ top:
 	/* Send the data out to the clients. */
 	for (p = clients, nclients = 0; p; p = p->next)
 	{
-		int written;
+		ssize_t written;
 
 		if (!FD_ISSET(p->fd, &writefds))
 			continue;
@@ -276,7 +276,7 @@ top:
 		written = 0;
 		while (written < len)
 		{
-			int n = write(p->fd, buf + written, len - written);
+			ssize_t n = write(p->fd, buf + written, len - written);
 
 			if (n > 0)
 			{
@@ -330,7 +330,7 @@ control_activity(int s)
 static void
 client_activity(struct client *p)
 {
-	int len;
+	ssize_t len;
 	struct packet pkt;
 
 	/* Read the activity. */
@@ -565,7 +565,7 @@ master_main(char **argv, int waitattach)
 	if (fd[0] != -1)
 	{
 		char buf[1024];
-		int len;
+		ssize_t len;
 
 		close(fd[1]);
 		len = read(fd[0], buf, sizeof(buf));

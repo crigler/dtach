@@ -1,6 +1,6 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(dtach, 0.8, crigler@users.sourceforge.net)
-AC_PREREQ(2.59)
+AC_PREREQ(2.60)
 AC_CONFIG_SRCDIR(main.c)
 AC_CONFIG_HEADER(config.h)
 
@@ -25,6 +25,7 @@ AC_HEADER_TIME
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_TYPE_PID_T
+AC_TYPE_SSIZE_T
 
 # Checks for library functions.
 AC_TYPE_SIGNAL
