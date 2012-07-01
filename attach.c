@@ -237,12 +237,16 @@ attach_main(int noerror)
 		/* stdin activity */
 		if (n > 0 && FD_ISSET(0, &readfds))
 		{
+			ssize_t len;
+
 			pkt.type = MSG_PUSH;
 			memset(pkt.u.buf, 0, sizeof(pkt.u.buf));
-			pkt.len = read(0, pkt.u.buf, sizeof(pkt.u.buf));
+			len = read(0, pkt.u.buf, sizeof(pkt.u.buf));
 
-			if (pkt.len <= 0)
+			if (len <= 0)
 				exit(1);
+
+			pkt.len = len;
 			process_kbd(s, &pkt);
 			n--;
 		}

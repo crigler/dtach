@@ -351,7 +351,10 @@ client_activity(struct client *p)
 
 	/* Push out data to the program. */
 	if (pkt.type == MSG_PUSH)
-		write(the_pty.fd, pkt.u.buf, pkt.len);
+	{
+		if (pkt.len <= sizeof(pkt.u.buf))
+			write(the_pty.fd, pkt.u.buf, pkt.len);
+	}
 
 	/* Attach or detach from the program. */
 	else if (pkt.type == MSG_ATTACH)
