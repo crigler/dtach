@@ -597,6 +597,18 @@ openpty(int *amaster, int *aslave, char *name, struct termios *termp,
 	int master, slave;
 	char *buf;
 
+#ifdef _AIX
+	master = open("/dev/ptc", O_RDWR|O_NOCTTY);
+	if (master < 0)
+		return -1;
+	buf = ttyname(master);
+	if (!buf)
+		return -1;
+
+	slave = open(buf, O_RDWR|O_NOCTTY);
+	if (slave < 0)
+		return -1;
+#else
 	master = open("/dev/ptmx", O_RDWR);
 	if (master < 0)
 		return -1;
@@ -617,6 +629,7 @@ openpty(int *amaster, int *aslave, char *name, struct termios *termp,
 		return -1;
 	if (ioctl(slave, I_PUSH, "ldterm") < 0)
 		return -1;
+#endif
 #endif
 
 	*amaster = master;
@@ -660,6 +673,27 @@ forkpty(int *amaster, char *name, struct termios *termp,
 #ifdef TIOCSCTTY
 		buf = NULL;
 		if (ioctl(slave, TIOCSCTTY, NULL) < 0)
+			_exit(1);
+#elif defined(_AIX)
+		fd = open("/dev/tty", O_RDWR|O_NOCTTY);
+		if (fd >= 0)
+		{
+			ioctl(fd, TIOCNOTTY, NULL);
+			close(fd);
+		}
+
+		buf = ttyname(master);
+		fd = open(buf, O_RDWR);
+		close(fd);
+
+		fd = open("/dev/tty", O_WRONLY);
+		if (fd < 0)
+			_exit(1);
+		close(fd);
+
+		if (termp && tcsetattr(slave, TCSAFLUSH, termp) == -1)
+			_exit(1);
+		if (ioctl(slave, TIOCSWINSZ, winp) == -1)
 			_exit(1);
 #else
 		buf = ptsname(master);
