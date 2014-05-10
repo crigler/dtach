@@ -190,6 +190,7 @@ attach_main(int noerror)
 	write(1, "\33[H\33[J", 6);
 
 	/* Tell the master that we want to attach. */
+	memset(&pkt, 0, sizeof(struct packet));
 	pkt.type = MSG_ATTACH;
 	write(s, &pkt, sizeof(struct packet));
 
