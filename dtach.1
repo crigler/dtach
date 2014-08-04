@@ -13,6 +13,9 @@ dtach \- simple program that emulates the detach feature of screen.
 .br
 .B dtach \-n
 .I <socket> <options> <command...>
+.br
+.B dtach \-N
+.I <socket> <options> <command...>
 
 .SH DESCRIPTION
 .B dtach
@@ -93,6 +96,13 @@ which the specified program is executed.
 .B dtach
 does not try to attach to the newly created session, however, and exits
 instead.
+.TP
+.B \-N
+Creates a new session, without attaching to it or daemonizing. A new session is
+created in which the specified program is executed.
+.B dtach
+does not try to attach to the newly created session, however, and will stay
+in the foreground until the program exits.
 
 .PP
 .SS OPTIONS

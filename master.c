@@ -543,7 +543,7 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 }
 
 int
-master_main(char **argv, int waitattach)
+master_main(char **argv, int waitattach, int dontfork)
 {
 	int fd[2] = {-1, -1};
 	int s;
@@ -566,7 +566,16 @@ master_main(char **argv, int waitattach)
 
 	/* If FD_CLOEXEC works, create a pipe and use it to report any errors
 	** that occur while trying to execute the program. */
-	if (pipe(fd) >= 0)
+	if (dontfork)
+	{
+		fd[1] = dup(2);
+		if (fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)
+		{
+			close(fd[1]);
+			fd[1] = -1;
+		}
+	}
+	else if (pipe(fd) >= 0)
 	{
 		if (fcntl(fd[0], F_SETFD, FD_CLOEXEC) < 0 ||
 		    fcntl(fd[1], F_SETFD, FD_CLOEXEC) < 0)
@@ -577,6 +586,12 @@ master_main(char **argv, int waitattach)
 		}
 	}
 #endif
+
+	if (dontfork)
+	{
+		master_process(s, argv, waitattach, fd[1]);
+		return 0;
+	}
 
 	/* Fork off so we can daemonize and such */
 	pid = fork();
