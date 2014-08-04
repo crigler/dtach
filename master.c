@@ -185,6 +185,12 @@ create_socket(char *name)
 	int s;
 	struct sockaddr_un sockun;
 
+	if (strlen(name) > sizeof(sockun.sun_path) - 1)
+	{
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
 	s = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (s < 0)
 		return -1;
