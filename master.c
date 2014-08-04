@@ -214,6 +214,25 @@ create_socket(char *name)
 	return s;
 }
 
+/* Update the modes on the socket. */
+static void
+update_socket_modes(int exec)
+{
+	struct stat st;
+	mode_t newmode;
+
+	if (stat(sockname, &st) < 0)
+		return;
+
+	if (exec)
+		newmode = st.st_mode | S_IXUSR;
+	else
+		newmode = st.st_mode & ~S_IXUSR;
+
+	if (st.st_mode != newmode)
+		chmod(sockname, newmode);
+}
+
 /* Process activity on the pty - Input and terminal changes are sent out to
 ** the attached clients. If the pty goes away, we die. */
 static void
@@ -415,6 +434,8 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	int highest_fd;
 	int nullfd;
 
+	int has_attached_client = 0;
+
 	/* Okay, disassociate ourselves from the original terminal, as we
 	** don't care what happens to it. */
 	setsid();
@@ -457,6 +478,8 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	/* Loop forever. */
 	while (1)
 	{
+		int new_has_attached_client = 0;
+
 		/* Re-initialize the file descriptor set for select. */
 		FD_ZERO(&readfds);
 		FD_SET(s, &readfds);
@@ -483,6 +506,16 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 			FD_SET(p->fd, &readfds);
 			if (p->fd > highest_fd)
 				highest_fd = p->fd;
+
+			if (p->attached)
+				new_has_attached_client = 1;
+		}
+
+		/* chmod the socket if necessary. */
+		if (has_attached_client != new_has_attached_client)
+		{
+			update_socket_modes(new_has_attached_client);
+			has_attached_client = new_has_attached_client;
 		}
 
 		/* Wait for something to happen. */
