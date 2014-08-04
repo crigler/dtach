@@ -561,6 +561,28 @@ master_main(char **argv, int waitattach, int dontfork)
 
 	/* Create the unix domain socket. */
 	s = create_socket(sockname);
+	if (s < 0 && errno == ENAMETOOLONG)
+	{
+		char *slash = strrchr(sockname, '/');
+
+		/* Try to shorten the socket's path name by using chdir. */
+		if (slash)
+		{
+			int dirfd = open(".", O_RDONLY);
+
+			if (dirfd >= 0)
+			{
+				*slash = '\0';
+				if (chdir(sockname) >= 0)
+				{
+					s = create_socket(slash + 1);
+					fchdir(dirfd);
+				}
+				*slash = '/';
+				close(dirfd);
+			}
+		}
+	}
 	if (s < 0)
 	{
 		printf("%s: %s: %s\n", progname, sockname, strerror(errno));

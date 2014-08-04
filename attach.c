@@ -156,6 +156,28 @@ attach_main(int noerror)
 	/* Attempt to open the socket. Don't display an error if noerror is 
 	** set. */
 	s = connect_socket(sockname);
+	if (s < 0 && errno == ENAMETOOLONG)
+	{
+		char *slash = strrchr(sockname, '/');
+
+		/* Try to shorten the socket's path name by using chdir. */
+		if (slash)
+		{
+			int dirfd = open(".", O_RDONLY);
+
+			if (dirfd >= 0)
+			{
+				*slash = '\0';
+				if (chdir(sockname) >= 0)
+				{
+					s = connect_socket(slash + 1);
+					fchdir(dirfd);
+				}
+				*slash = '/';
+				close(dirfd);
+			}
+		}
+	}
 	if (s < 0)
 	{
 		if (!noerror)
