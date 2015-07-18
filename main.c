@@ -56,6 +56,7 @@ usage()
 		"       dtach -c <socket> <options> <command...>\n"
 		"       dtach -n <socket> <options> <command...>\n"
 		"       dtach -N <socket> <options> <command...>\n"
+		"       dtach -p <socket>\n"
 		"Modes:\n"
 		"  -a\t\tAttach to the specified socket.\n"
 		"  -A\t\tAttach to the specified socket, or create it if it\n"
@@ -66,6 +67,8 @@ usage()
 		"  -N\t\tCreate a new socket and run the specified command "
 		"detached,\n"
 		"\t\t  and have dtach run in the foreground.\n"
+		"  -p\t\tCopy the contents of standard input to the specified\n"
+		"\t\t  socket.\n"
 		"Options:\n"
 		"  -e <char>\tSet the detach character to <char>, defaults "
 		"to ^\\.\n"
@@ -106,7 +109,7 @@ main(int argc, char **argv)
 		if (mode == '?')
 			usage();
 		else if (mode != 'a' && mode != 'c' && mode != 'n' &&
-			 mode != 'A' && mode != 'N')
+			 mode != 'A' && mode != 'N' && mode != 'p')
 		{
 			printf("%s: Invalid mode '-%c'\n", progname, mode);
 			printf("Try '%s --help' for more information.\n",
@@ -132,6 +135,19 @@ main(int argc, char **argv)
 	}
 	sockname = *argv;
 	++argv; --argc;
+
+	if (mode == 'p')
+	{
+		if (argc > 0)
+		{
+			printf("%s: Invalid number of arguments.\n",
+				progname);
+			printf("Try '%s --help' for more information.\n",
+				progname);
+			return 1;
+		}
+		return push_main();
+	}
 
 	while (argc >= 1 && **argv == '-')
 	{

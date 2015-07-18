@@ -66,6 +66,15 @@ will likely encounter problems if your terminals have different window
 sizes. Pressing ^L (Ctrl-L) will reset the window size of the program to
 match the current terminal.
 
+dtach also has a mode that copies the contents of standard input to a session.
+For example:
+
+	$ echo -ne 'cd /var/log\nls -l\n' | dtach -p /tmp/foozle
+
+The contents are sent verbatim including any embedded control characters (e.g.
+the newline characters in the above example), and dtach will not scan the
+input for a detach character.
+
 3. DETACHING FROM THE SESSION
 
 By default, dtach scans the keyboard input looking for the detach character.

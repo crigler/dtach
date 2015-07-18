@@ -129,6 +129,7 @@ struct packet
 
 int attach_main(int noerror);
 int master_main(char **argv, int waitattach, int dontfork);
+int push_main(void);
 
 #ifdef sun
 #define BROKEN_MASTER

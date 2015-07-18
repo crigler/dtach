@@ -16,6 +16,9 @@ dtach \- simple program that emulates the detach feature of screen.
 .br
 .B dtach \-N
 .I <socket> <options> <command...>
+.br
+.B dtach \-p
+.I <socket>
 
 .SH DESCRIPTION
 .B dtach
@@ -103,6 +106,14 @@ created in which the specified program is executed.
 .B dtach
 does not try to attach to the newly created session, however, and will stay
 in the foreground until the program exits.
+.TP
+.B \-p
+Copies the contents of standard input to a session.
+.B dtach
+connects to the session specified by
+.IR <socket> ,
+copies the contents of standard input to the session, and then exits. dtach
+will not scan the input for a detach character.
 
 .PP
 .SS OPTIONS
