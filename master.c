@@ -449,6 +449,16 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	/* Set a trap to unlink the socket when we die. */
 	atexit(unlink_socket);
 
+	/* Create a pty in which the process is running. */
+	signal(SIGCHLD, die);
+	if (init_pty(argv, statusfd) < 0)
+	{
+		if (statusfd != -1)
+			dup2(statusfd, 1);
+		printf("%s: init_pty: %s\n", progname, strerror(errno));
+		exit(1);
+	}
+
 	/* Set up some signals. */
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGXFSZ, SIG_IGN);
@@ -457,17 +467,7 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	signal(SIGTTOU, SIG_IGN);
 	signal(SIGINT, die);
 	signal(SIGTERM, die);
-	signal(SIGCHLD, die);
 
-	/* Create a pty in which the process is running. */
-	if (init_pty(argv, statusfd) < 0)
-	{
-		if (statusfd != -1)
-			dup2(statusfd, 1);
-		printf("%s: init_pty: %s\n", progname, strerror(errno));
-		exit(1);
-	}
-	
 	/* Close statusfd, since we don't need it anymore. */
 	if (statusfd != -1)
 		close(statusfd);
