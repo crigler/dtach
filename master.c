@@ -455,7 +455,10 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	{
 		if (statusfd != -1)
 			dup2(statusfd, 1);
-		printf("%s: init_pty: %s\n", progname, strerror(errno));
+		if (errno == ENOENT)
+			printf("%s: Could not find a pty.\n", progname);
+		else
+			printf("%s: init_pty: %s\n", progname, strerror(errno));
 		exit(1);
 	}
 

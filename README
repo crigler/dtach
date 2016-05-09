@@ -31,6 +31,10 @@ be easily portable to other variants of Unix. It currently assumes that
 the host system uses POSIX termios, and has a working forkpty function
 available.
 
+dtach may need access to various devices in the filesystem depending on what
+forkpty does. For example, dtach on Linux usually needs access to /dev/ptmx
+and /dev/pts.
+
 2. QUICK START
 
 Compiling dtach should be simple, as it uses autoconf:
