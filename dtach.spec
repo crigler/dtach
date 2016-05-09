@@ -1,6 +1,6 @@
 Summary: A simple program that emulates the detach feature of screen.
 Name: dtach
-Version: 0.8
+Version: 0.9
 Release: 1
 License: GPL
 URL: http://dtach.sourceforge.net
@@ -43,6 +43,9 @@ rm -rf $RPM_BUILD_DIR/%{name}-%{version}
 %{_mandir}/*/*
 
 %changelog
+* Sun May 8 2016 Ned T. Crigler <crigler@users.sourceforge.net> 0.9
+- New release
+
 * Wed Jan 30 2008 Ned T. Crigler <crigler@users.sourceforge.net> 0.8
 - New release
 

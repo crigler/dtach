@@ -127,6 +127,22 @@ method is used as the default redraw method for the session.
 
 6. CHANGES
 
+The changes in version 0.9 are:
+- Added AIX support.
+- Added dtach -N, a mode similar to dtach -n, except dtach will stay in the
+  foreground instead of daemonizing.
+- Added dtach -p, which copies the contents of standard input to a session.
+- dtach will no longer send 255 bytes of garbage to the program when read()
+  returns an error.
+- The executable bit is now set on the socket if clients are attached, and
+  cleared when all clients have detached.
+- The initial state of signals such as SIGPIPE are now preserved when
+  executing the program, instead of having the program start with some signals
+  ignored.
+- A buffer overflow no longer occurs when a long socket path name is used, and
+  dtach will now try to use chdir to get around the length limitation if
+  necessary.
+
 The changes in version 0.8 are:
 - When using dtach -A or dtach -c, the master will now wait until the client
   attaches before trying to read from the program being executed. This avoids
