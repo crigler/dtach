@@ -40,8 +40,11 @@ restore_term(void)
 	tcsetattr(0, TCSADRAIN, &orig_term);
 
 	/* Make cursor visible. Assumes VT100. */
-	printf("\033[?25h");
+	if (!no_ansiterm)
+	    printf("\033[?25h");
 	fflush(stdout);
+	if (no_ansiterm)
+	    (void)system("tput init 2>/dev/null");
 }
 
 /* Connects to a unix domain socket */
@@ -214,7 +217,8 @@ attach_main(int noerror)
 	tcsetattr(0, TCSADRAIN, &cur_term);
 
 	/* Clear the screen. This assumes VT100. */
-	write(1, "\33[H\33[J", 6);
+	if (!no_ansiterm)
+	    write(1, "\33[H\33[J", 6);
 
 	/* Tell the master that we want to attach. */
 	memset(&pkt, 0, sizeof(struct packet));

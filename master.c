@@ -183,6 +183,7 @@ create_socket(char *name)
 {
 	int s;
 	struct sockaddr_un sockun;
+	mode_t omask;
 
 	if (strlen(name) > sizeof(sockun.sun_path) - 1)
 	{
@@ -190,7 +191,9 @@ create_socket(char *name)
 		return -1;
 	}
 
+	omask = umask(077);
 	s = socket(PF_UNIX, SOCK_STREAM, 0);
+	umask(omask);	/* umask always succeeds, errno is untouched. */
 	if (s < 0)
 		return -1;
 	sockun.sun_family = AF_UNIX;
