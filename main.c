@@ -39,6 +39,7 @@ int no_suspend;
 int redraw_method = REDRAW_UNSPEC;
 /* The default clear method. Initially set to unspecified. */
 int clear_method = CLEAR_UNSPEC;
+int quiet = 0;
 
 /*
 ** The original terminal settings. Shared between the master and attach
@@ -85,6 +86,7 @@ usage()
 		"\t\t     none: Don't clear at all.\n"
 		"\t\t     move: Move to last line (default behaviour).\n"
 		"  -z\t\tDisable processing of the suspend key.\n"
+		"  -q\t\tDisable printing of additional messages.\n"
 		"\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
 		PACKAGE_VERSION, __DATE__, __TIME__);
 	exit(0);
@@ -165,6 +167,8 @@ main(int argc, char **argv)
 				detach_char = -1;
 			else if (*p == 'z')
 				no_suspend = 1;
+			else if (*p == 'q')
+				quiet = 1;
 			else if (*p == 'e')
 			{
 				++argv; --argc;

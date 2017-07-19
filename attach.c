@@ -217,7 +217,11 @@ attach_main(int noerror)
 
 	/* Clear the screen. This assumes VT100. */
 	if (clear_method == CLEAR_NONE)
-		write(1, "\r\n", 2);
+		if (!quiet)
+			write(1, "\r\n", 2);
+		else {
+			// NOTE:  Nothing to do in this case!
+		}
 	else
 		write(1, "\033c", 2);
 
@@ -254,7 +258,8 @@ attach_main(int noerror)
 
 			if (len == 0)
 			{
-				printf("%s[EOF - dtach terminating]\r\n", clear_csi_data());
+				if (!quiet)
+					printf("%s[EOF - dtach terminating]\r\n", clear_csi_data());
 				exit(0);
 			}
 			else if (len < 0)
