@@ -152,6 +152,11 @@ main(int argc, char **argv)
 	{
 		char *p;
 
+		if (strcmp(argv[0], "--") == 0) {
+			++argv; --argc;
+			break;
+		}
+
 		for (p = argv[0] + 1; *p; ++p)
 		{
 			if (*p == 'E')
