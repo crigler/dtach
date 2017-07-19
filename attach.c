@@ -216,7 +216,10 @@ attach_main(int noerror)
 	tcsetattr(0, TCSADRAIN, &cur_term);
 
 	/* Clear the screen. This assumes VT100. */
-	write(1, "\33[H\33[J", 6);
+	if (clear_method == CLEAR_NONE)
+		write(1, "\r\n", 2);
+	else
+		write(1, "\033c", 2);
 
 	/* Tell the master that we want to attach. */
 	memset(&pkt, 0, sizeof(struct packet));

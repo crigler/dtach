@@ -82,7 +82,7 @@
 #endif
 
 extern char *progname, *sockname;
-extern int detach_char, no_suspend, redraw_method;
+extern int detach_char, no_suspend, redraw_method, clear_method;
 extern struct termios orig_term;
 extern int dont_have_tty;
 
@@ -101,6 +101,13 @@ enum
 	REDRAW_NONE	= 1,
 	REDRAW_CTRL_L	= 2,
 	REDRAW_WINCH	= 3,
+};
+
+enum
+{
+	CLEAR_UNSPEC	= 0,
+	CLEAR_NONE	= 1,
+	CLEAR_MOVE	= 2,
 };
 
 /* The client to master protocol. */
