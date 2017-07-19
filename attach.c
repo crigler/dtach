@@ -39,9 +39,10 @@ static void
 restore_term(void)
 {
 	tcsetattr(0, TCSADRAIN, &orig_term);
-
-	/* Make cursor visible. Assumes VT100. */
-	printf("\033[?25h");
+	
+	/* Reset terminal and make cursor visible. Assumes VT100. */
+	printf("\033[0m\033[?25h");
+	
 	fflush(stdout);
 }
 
