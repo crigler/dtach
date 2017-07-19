@@ -282,3 +282,18 @@ main(int argc, char **argv)
 	}
 	return 0;
 }
+
+
+char const * clear_csi_data()
+{
+	switch (clear_method) {
+		case CLEAR_NONE :
+			return "\r\n";
+		case CLEAR_UNSPEC :
+		case CLEAR_MOVE :
+		default :
+			/* This hopefully moves to the bottom of the screen */
+			return "\033[999H\r\n";
+	}
+}
+

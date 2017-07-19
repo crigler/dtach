@@ -124,12 +124,11 @@ struct packet
 */
 #define BUFSIZE 4096
 
-/* This hopefully moves to the bottom of the screen */
-#define EOS "\033[999H"
-
 int attach_main(int noerror);
 int master_main(char **argv, int waitattach, int dontfork);
 int push_main(void);
+
+char const * clear_csi_data();
 
 #ifdef sun
 #define BROKEN_MASTER

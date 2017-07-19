@@ -130,7 +130,7 @@ init_pty(char **argv, int statusfd)
 		if (statusfd != -1)
 			dup2(statusfd, 1);
 		else
-			printf(EOS "\r\n");
+			printf("%s", clear_csi_data());
 
 		printf("%s: could not execute %s: %s\r\n", progname,
 		       *argv, strerror(errno));
