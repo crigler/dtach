@@ -96,7 +96,7 @@ die(int sig)
 
 /* Window size change. */
 static RETSIGTYPE
-win_change()
+win_change(int sig)
 {
 	signal(SIGWINCH, win_change);
 	win_changed = 1;
