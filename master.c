@@ -134,7 +134,7 @@ init_pty(char **argv, int statusfd)
 		printf("%s: could not execute %s: %s\r\n", progname,
 		       *argv, strerror(errno));
 		fflush(stdout);
-		_exit(127);
+		_exit(1);
 	}
 	/* Parent.. Finish up and return */
 #ifdef BROKEN_MASTER
@@ -261,7 +261,16 @@ pty_activity(int s)
 
 	/* Error -> die */
 	if (len <= 0)
+	{
+		int status;
+
+		if (wait(&status) >= 0)
+		{
+			if (WIFEXITED(status))
+				exit(WEXITSTATUS(status));
+		}
 		exit(1);
+	}
 
 #ifdef BROKEN_MASTER
 	/* Get the current terminal settings. */
