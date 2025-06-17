@@ -193,16 +193,20 @@ create_socket(char *name)
 
 	omask = umask(077);
 	s = socket(PF_UNIX, SOCK_STREAM, 0);
-	umask(omask);	/* umask always succeeds, errno is untouched. */
 	if (s < 0)
+	{
+		umask(omask); /* umask always succeeds, errno is untouched. */
 		return -1;
+	}
 	sockun.sun_family = AF_UNIX;
 	strcpy(sockun.sun_path, name);
 	if (bind(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
 	{
+		umask(omask); /* umask always succeeds, errno is untouched. */
 		close(s);
 		return -1;
 	}
+	umask(omask); /* umask always succeeds, errno is untouched. */
 	if (listen(s, 128) < 0)
 	{
 		close(s);
@@ -213,7 +217,7 @@ create_socket(char *name)
 		close(s);
 		return -1;
 	}
-	/* chmod it to prevent any suprises */
+	/* chmod it to prevent any surprises */
 	if (chmod(name, 0600) < 0)
 	{
 		close(s);
