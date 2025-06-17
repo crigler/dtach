@@ -18,6 +18,18 @@
 #ifndef dtach_h
 #define dtach_h
 
+#if defined(__has_attribute)
+#if __has_attribute(unused)
+#define ATTRIBUTE_UNUSED __attribute__((__unused__))
+#else
+#define ATTRIBUTE_UNUSED
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define ATTRIBUTE_UNUSED __attribute__((__unused__))
+#else
+#define ATTRIBUTE_UNUSED
+#endif
+
 #include <config.h>
 
 #include <errno.h>
