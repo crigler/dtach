@@ -38,9 +38,10 @@ static void
 restore_term(void)
 {
 	tcsetattr(0, TCSADRAIN, &orig_term);
-
-	/* Make cursor visible. Assumes VT100. */
-	printf("\033[?25h");
+	
+	/* Reset terminal and make cursor visible. Assumes VT100. */
+	printf("\033[0m\033[?25h");
+	
 	fflush(stdout);
 }
 
@@ -88,9 +89,9 @@ die(int sig)
 {
 	/* Print a nice pretty message for some things. */
 	if (sig == SIGHUP || sig == SIGINT)
-		printf(EOS "\r\n[detached]\r\n");
+		printf("%s[detached]\r\n", clear_csi_data());
 	else
-		printf(EOS "\r\n[got signal %d - dying]\r\n", sig);
+		printf("%s[got signal %d - dying]\r\n", clear_csi_data(), sig);
 	exit(1);
 }
 
@@ -115,7 +116,7 @@ process_kbd(int s, struct packet *pkt)
 
 		/* And suspend... */
 		tcsetattr(0, TCSADRAIN, &orig_term);
-		printf(EOS "\r\n");
+		printf("%s", clear_csi_data());
 		kill(getpid(), SIGTSTP);
 		tcsetattr(0, TCSADRAIN, &cur_term);
 
@@ -133,7 +134,7 @@ process_kbd(int s, struct packet *pkt)
 	/* Detach char? */
 	else if (pkt->u.buf[0] == detach_char)
 	{
-		printf(EOS "\r\n[detached]\r\n");
+		printf("%s[detached]\r\n", clear_csi_data());
 		exit(0);
 	}
 	/* Just in case something pukes out. */
@@ -214,7 +215,14 @@ attach_main(int noerror)
 	tcsetattr(0, TCSADRAIN, &cur_term);
 
 	/* Clear the screen. This assumes VT100. */
-	write(1, "\33[H\33[J", 6);
+	if (clear_method == CLEAR_NONE)
+		if (!quiet)
+			write(1, "\r\n", 2);
+		else {
+			// NOTE:  Nothing to do in this case!
+		}
+	else
+		write(1, "\033c", 2);
 
 	/* Tell the master that we want to attach. */
 	memset(&pkt, 0, sizeof(struct packet));
@@ -238,7 +246,7 @@ attach_main(int noerror)
 		n = select(s + 1, &readfds, NULL, NULL, NULL);
 		if (n < 0 && errno != EINTR && errno != EAGAIN)
 		{
-			printf(EOS "\r\n[select failed]\r\n");
+			printf("%s[select failed]\r\n", clear_csi_data());
 			exit(1);
 		}
 
@@ -249,13 +257,13 @@ attach_main(int noerror)
 
 			if (len == 0)
 			{
-				printf(EOS "\r\n[EOF - dtach terminating]"
-					"\r\n");
+				if (!quiet)
+					printf("%s[EOF - dtach terminating]\r\n", clear_csi_data());
 				exit(0);
 			}
 			else if (len < 0)
 			{
-				printf(EOS "\r\n[read returned an error]\r\n");
+				printf("%s[read returned an error]\r\n", clear_csi_data());
 				exit(1);
 			}
 			/* Send the data to the terminal. */

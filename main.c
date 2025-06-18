@@ -36,6 +36,9 @@ int detach_char = '\\' - 64;
 int no_suspend;
 /* The default redraw method. Initially set to unspecified. */
 int redraw_method = REDRAW_UNSPEC;
+/* The default clear method. Initially set to unspecified. */
+int clear_method = CLEAR_UNSPEC;
+int quiet = 0;
 
 /*
 ** The original terminal settings. Shared between the master and attach
@@ -77,7 +80,12 @@ usage()
 		"\t\t     none: Don't redraw at all.\n"
 		"\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
 		"\t\t    winch: Send a WINCH signal to the program.\n"
+		"  -R <method>\tSet the clear method to <method>. The "
+		"valid methods are:\n"
+		"\t\t     none: Don't clear at all.\n"
+		"\t\t     move: Move to last line (default behaviour).\n"
 		"  -z\t\tDisable processing of the suspend key.\n"
+		"  -q\t\tDisable printing of additional messages.\n"
 		"\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
 		PACKAGE_VERSION, __DATE__, __TIME__);
 	exit(0);
@@ -163,6 +171,8 @@ main(int argc, char **argv)
 				detach_char = -1;
 			else if (*p == 'z')
 				no_suspend = 1;
+			else if (*p == 'q')
+				quiet = 1;
 			else if (*p == 'e')
 			{
 				++argv; --argc;
@@ -206,6 +216,31 @@ main(int argc, char **argv)
 				{
 					printf("%s: Invalid redraw method "
 						"specified.\n", progname);	
+					printf("Try '%s --help' for more "
+						"information.\n", progname);
+					return 1;
+				}
+				break;
+			}
+			else if (*p == 'R')
+			{
+				++argv; --argc;
+				if (argc < 1)
+				{
+					printf("%s: No clear method "
+						"specified.\n", progname);	
+					printf("Try '%s --help' for more "
+						"information.\n", progname);
+					return 1;
+				}
+				if (strcmp(argv[0], "none") == 0)
+					clear_method = CLEAR_NONE;
+				else if (strcmp(argv[0], "move") == 0)
+					clear_method = CLEAR_MOVE;
+				else
+				{
+					printf("%s: Invalid clear method "
+						"specified.\n", progname);
 					printf("Try '%s --help' for more "
 						"information.\n", progname);
 					return 1;
@@ -286,3 +321,18 @@ main(int argc, char **argv)
 	}
 	return 0;
 }
+
+
+char const * clear_csi_data()
+{
+	switch (clear_method) {
+		case CLEAR_NONE :
+			return "\r\n";
+		case CLEAR_UNSPEC :
+		case CLEAR_MOVE :
+		default :
+			/* This hopefully moves to the bottom of the screen */
+			return "\033[999H\r\n";
+	}
+}
+
