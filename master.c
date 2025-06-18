@@ -193,6 +193,7 @@ create_socket(char *name)
 
 	omask = umask(077);
 	s = socket(PF_UNIX, SOCK_STREAM, 0);
+	umask(omask);	/* umask always succeeds, errno is untouched. */
 	if (s < 0)
 	{
 		umask(omask); /* umask always succeeds, errno is untouched. */
