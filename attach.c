@@ -170,7 +170,11 @@ attach_main(int noerror)
 				if (chdir(sockname) >= 0)
 				{
 					s = connect_socket(slash + 1);
-					fchdir(dirfd);
+					if (s >= 0 && fchdir(dirfd) < 0)
+					{
+						close(s);
+						s = -1;
+					}
 				}
 				*slash = '/';
 				close(dirfd);
@@ -315,7 +319,11 @@ push_main()
 				if (chdir(sockname) >= 0)
 				{
 					s = connect_socket(slash + 1);
-					fchdir(dirfd);
+					if (s >= 0 && fchdir(dirfd) < 0)
+					{
+						close(s);
+						s = -1;
+					}
 				}
 				*slash = '/';
 				close(dirfd);

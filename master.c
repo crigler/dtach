@@ -594,7 +594,11 @@ master_main(char **argv, int waitattach, int dontfork)
 				if (chdir(sockname) >= 0)
 				{
 					s = create_socket(slash + 1);
-					fchdir(dirfd);
+					if (s >= 0 && fchdir(dirfd) < 0)
+					{
+						close(s);
+						s = -1;
+					}
 				}
 				*slash = '/';
 				close(dirfd);
