@@ -45,6 +45,49 @@ int redraw_method = REDRAW_UNSPEC;
 struct termios orig_term;
 int dont_have_tty;
 
+/* Write buf to fd handling partial writes. Exit on failure. */
+void
+write_buf_or_fail(int fd, const void *buf, size_t count)
+{
+	while (count != 0)
+	{
+		ssize_t ret = write(fd, buf, count);
+
+		if (ret >= 0)
+		{
+			buf = (const char *)buf + ret;
+			count -= ret;
+		}
+		else if (ret < 0 && errno == EINTR)
+			continue;
+		else
+		{
+			printf(EOS "\r\n[write failed]\r\n");
+			exit(1);
+		}
+	}
+}
+
+/* Write pkt to fd. Exit on failure. */
+void
+write_packet_or_fail(int fd, const struct packet *pkt)
+{
+	while (1)
+	{
+		ssize_t ret = write(fd, pkt, sizeof(struct packet));
+
+		if (ret == sizeof(struct packet))
+			return;
+		else if (ret < 0 && errno == EINTR)
+			continue;
+		else
+		{
+			printf(EOS "\r\n[write failed]\r\n");
+			exit(1);
+		}
+	}
+}
+
 static void
 usage()
 {

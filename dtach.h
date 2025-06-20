@@ -139,6 +139,9 @@ struct packet
 /* This hopefully moves to the bottom of the screen */
 #define EOS "\033[999H"
 
+void write_buf_or_fail(int fd, const void *buf, size_t count);
+void write_packet_or_fail(int fd, const struct packet *pkt);
+
 int attach_main(int noerror);
 int master_main(char **argv, int waitattach, int dontfork);
 int push_main(void);

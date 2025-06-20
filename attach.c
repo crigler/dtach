@@ -111,7 +111,7 @@ process_kbd(int s, struct packet *pkt)
 	{
 		/* Tell the master that we are suspending. */
 		pkt->type = MSG_DETACH;
-		write(s, pkt, sizeof(struct packet));
+		write_packet_or_fail(s, pkt);
 
 		/* And suspend... */
 		tcsetattr(0, TCSADRAIN, &orig_term);
@@ -121,13 +121,13 @@ process_kbd(int s, struct packet *pkt)
 
 		/* Tell the master that we are returning. */
 		pkt->type = MSG_ATTACH;
-		write(s, pkt, sizeof(struct packet));
+		write_packet_or_fail(s, pkt);
 
 		/* We would like a redraw, too. */
 		pkt->type = MSG_REDRAW;
 		pkt->len = redraw_method;
 		ioctl(0, TIOCGWINSZ, &pkt->u.ws);
-		write(s, pkt, sizeof(struct packet));
+		write_packet_or_fail(s, pkt);
 		return;
 	}
 	/* Detach char? */
@@ -141,7 +141,7 @@ process_kbd(int s, struct packet *pkt)
 		win_changed = 1;
 
 	/* Push it out */
-	write(s, pkt, sizeof(struct packet));
+	write_packet_or_fail(s, pkt);
 }
 
 int
@@ -218,18 +218,18 @@ attach_main(int noerror)
 	tcsetattr(0, TCSADRAIN, &cur_term);
 
 	/* Clear the screen. This assumes VT100. */
-	write(1, "\33[H\33[J", 6);
+	write_buf_or_fail(1, "\33[H\33[J", 6);
 
 	/* Tell the master that we want to attach. */
 	memset(&pkt, 0, sizeof(struct packet));
 	pkt.type = MSG_ATTACH;
-	write(s, &pkt, sizeof(struct packet));
+	write_packet_or_fail(s, &pkt);
 
 	/* We would like a redraw, too. */
 	pkt.type = MSG_REDRAW;
 	pkt.len = redraw_method;
 	ioctl(0, TIOCGWINSZ, &pkt.u.ws);
-	write(s, &pkt, sizeof(struct packet));
+	write_packet_or_fail(s, &pkt);
 
 	/* Wait for things to happen */
 	while (1)
@@ -263,7 +263,7 @@ attach_main(int noerror)
 				exit(1);
 			}
 			/* Send the data to the terminal. */
-			write(1, buf, len);
+			write_buf_or_fail(1, buf, len);
 			n--;
 		}
 		/* stdin activity */
@@ -290,7 +290,7 @@ attach_main(int noerror)
 
 			pkt.type = MSG_WINCH;
 			ioctl(0, TIOCGWINSZ, &pkt.u.ws);
-			write(s, &pkt, sizeof(pkt));
+			write_packet_or_fail(s, &pkt);
 		}
 	}
 	return 0;
@@ -358,8 +358,12 @@ push_main()
 		}
 
 		pkt.len = len;
-		if (write(s, &pkt, sizeof(struct packet)) < 0)
+		len = write(s, &pkt, sizeof(struct packet));
+		if (len != sizeof(struct packet))
 		{
+			if (len >= 0)
+				errno = EPIPE;
+
 			printf("%s: %s: %s\n", progname, sockname,
 			       strerror(errno));
 			return 1;

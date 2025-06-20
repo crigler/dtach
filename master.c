@@ -379,7 +379,7 @@ client_activity(struct client *p)
 		return;
 
 	/* Close the client on an error. */
-	if (len <= 0)
+	if (len != sizeof(struct packet))
 	{
 		close(p->fd);
 		if (p->next)
@@ -393,7 +393,7 @@ client_activity(struct client *p)
 	if (pkt.type == MSG_PUSH)
 	{
 		if (pkt.len <= sizeof(pkt.u.buf))
-			write(the_pty.fd, pkt.u.buf, pkt.len);
+			write_buf_or_fail(the_pty.fd, pkt.u.buf, pkt.len);
 	}
 
 	/* Attach or detach from the program. */
@@ -434,7 +434,7 @@ client_activity(struct client *p)
                 	if (((the_pty.term.c_lflag & (ECHO|ICANON)) == 0) &&
                         	(the_pty.term.c_cc[VMIN] == 1))
 			{
-				write(the_pty.fd, &c, 1);
+				write_buf_or_fail(the_pty.fd, &c, 1);
 			}
 		}
 		/* Send a WINCH signal to the program. */
@@ -672,7 +672,7 @@ master_main(char **argv, int waitattach, int dontfork)
 		len = read(fd[0], buf, sizeof(buf));
 		if (len > 0)
 		{
-			write(2, buf, len);
+			write_buf_or_fail(2, buf, len);
 			kill(pid, SIGTERM);
 			return 1;
 		}
