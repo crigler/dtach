@@ -672,7 +672,12 @@ master_main(char **argv, int waitattach, int dontfork)
 		len = read(fd[0], buf, sizeof(buf));
 		if (len > 0)
 		{
-			write_buf_or_fail(2, buf, len);
+			do
+			{
+				write_buf_or_fail(2, buf, len);
+				len = read(fd[0], buf, sizeof(buf));
+			} while (len > 0);
+
 			kill(pid, SIGTERM);
 			return 1;
 		}
