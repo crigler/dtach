@@ -55,7 +55,7 @@ static struct pty the_pty;
 
 #ifndef HAVE_FORKPTY
 pid_t forkpty(int *amaster, char *name, struct termios *termp,
-	struct winsize *winp);
+	      struct winsize *winp);
 #endif
 
 /* Unlink the socket */
@@ -66,7 +66,7 @@ unlink_socket(void)
 }
 
 /* Signal */
-static RETSIGTYPE 
+static RETSIGTYPE
 die(int sig)
 {
 	/* Well, the child died. */
@@ -165,11 +165,11 @@ killpty(struct pty *pty, int sig)
 #ifdef TIOCGPGRP
 #ifdef BROKEN_MASTER
 	if (ioctl(pty->slave, TIOCGPGRP, &pgrp) >= 0 && pgrp != -1 &&
-		kill(-pgrp, sig) >= 0)
+	    kill(-pgrp, sig) >= 0)
 		return;
 #endif
 	if (ioctl(pty->fd, TIOCGPGRP, &pgrp) >= 0 && pgrp != -1 &&
-		kill(-pgrp, sig) >= 0)
+	    kill(-pgrp, sig) >= 0)
 		return;
 #endif
 
@@ -200,7 +200,7 @@ create_socket(char *name)
 	}
 	sockun.sun_family = AF_UNIX;
 	strcpy(sockun.sun_path, name);
-	if (bind(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
+	if (bind(s, (struct sockaddr *)&sockun, sizeof(sockun)) < 0)
 	{
 		umask(omask); /* umask always succeeds, errno is untouched. */
 		close(s);
@@ -344,7 +344,7 @@ control_activity(int s)
 {
 	int fd;
 	struct client *p;
- 
+
 	/* Accept the new client and link it in. */
 	fd = accept(s, NULL, NULL);
 	if (fd < 0)
@@ -387,7 +387,7 @@ client_activity(struct client *p)
 		*(p->pprev) = p->next;
 		free(p);
 		return;
-	} 
+	}
 
 	/* Push out data to the program. */
 	if (pkt.type == MSG_PUSH)
@@ -431,8 +431,8 @@ client_activity(struct client *p)
 		{
 			char c = '\f';
 
-                	if (((the_pty.term.c_lflag & (ECHO|ICANON)) == 0) &&
-                        	(the_pty.term.c_cc[VMIN] == 1))
+			if (((the_pty.term.c_lflag & (ECHO|ICANON)) == 0) &&
+			    (the_pty.term.c_cc[VMIN] == 1))
 			{
 				write_buf_or_fail(the_pty.fd, &c, 1);
 			}

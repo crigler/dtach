@@ -33,4 +33,3 @@ tar:
 attach.o: @srcdir@/attach.c @srcdir@/dtach.h config.h
 master.o: @srcdir@/master.c @srcdir@/dtach.h config.h
 main.o: @srcdir@/main.c @srcdir@/dtach.h config.h
-

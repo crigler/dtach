@@ -62,7 +62,7 @@ connect_socket(char *name)
 		return -1;
 	sockun.sun_family = AF_UNIX;
 	strcpy(sockun.sun_path, name);
-	if (connect(s, (struct sockaddr*)&sockun, sizeof(sockun)) < 0)
+	if (connect(s, (struct sockaddr *)&sockun, sizeof(sockun)) < 0)
 	{
 		close(s);
 
@@ -152,7 +152,7 @@ attach_main(int noerror)
 	fd_set readfds;
 	int s;
 
-	/* Attempt to open the socket. Don't display an error if noerror is 
+	/* Attempt to open the socket. Don't display an error if noerror is
 	** set. */
 	s = connect_socket(sockname);
 	if (s < 0 && errno == ENAMETOOLONG)
@@ -185,7 +185,7 @@ attach_main(int noerror)
 	{
 		if (!noerror)
 			printf("%s: %s: %s\n", progname, sockname,
-				strerror(errno));
+			       strerror(errno));
 		return 1;
 	}
 
@@ -254,7 +254,7 @@ attach_main(int noerror)
 			if (len == 0)
 			{
 				printf(EOS "\r\n[EOF - dtach terminating]"
-					"\r\n");
+				       "\r\n");
 				exit(0);
 			}
 			else if (len < 0)

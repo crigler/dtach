@@ -92,36 +92,36 @@ static void
 usage()
 {
 	printf(
-		"dtach - version %s, compiled on %s at %s.\n"
-		"Usage: dtach -a <socket> <options>\n"
-		"       dtach -A <socket> <options> <command...>\n"
-		"       dtach -c <socket> <options> <command...>\n"
-		"       dtach -n <socket> <options> <command...>\n"
-		"       dtach -N <socket> <options> <command...>\n"
-		"       dtach -p <socket>\n"
-		"Modes:\n"
-		"  -a\t\tAttach to the specified socket.\n"
-		"  -A\t\tAttach to the specified socket, or create it if it\n"
-		"\t\t  does not exist, running the specified command.\n"
-		"  -c\t\tCreate a new socket and run the specified command.\n"
-		"  -n\t\tCreate a new socket and run the specified command "
-		"detached.\n"
-		"  -N\t\tCreate a new socket and run the specified command "
-		"detached,\n"
-		"\t\t  and have dtach run in the foreground.\n"
-		"  -p\t\tCopy the contents of standard input to the specified\n"
-		"\t\t  socket.\n"
-		"Options:\n"
-		"  -e <char>\tSet the detach character to <char>, defaults "
-		"to ^\\.\n"
-		"  -E\t\tDisable the detach character.\n"
-		"  -r <method>\tSet the redraw method to <method>. The "
-		"valid methods are:\n"
-		"\t\t     none: Don't redraw at all.\n"
-		"\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
-		"\t\t    winch: Send a WINCH signal to the program.\n"
-		"  -z\t\tDisable processing of the suspend key.\n"
-		"\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
+	       "dtach - version %s, compiled on %s at %s.\n"
+	       "Usage: dtach -a <socket> <options>\n"
+	       "       dtach -A <socket> <options> <command...>\n"
+	       "       dtach -c <socket> <options> <command...>\n"
+	       "       dtach -n <socket> <options> <command...>\n"
+	       "       dtach -N <socket> <options> <command...>\n"
+	       "       dtach -p <socket>\n"
+	       "Modes:\n"
+	       "  -a\t\tAttach to the specified socket.\n"
+	       "  -A\t\tAttach to the specified socket, or create it if it\n"
+	       "\t\t  does not exist, running the specified command.\n"
+	       "  -c\t\tCreate a new socket and run the specified command.\n"
+	       "  -n\t\tCreate a new socket and run the specified command "
+	       "detached.\n"
+	       "  -N\t\tCreate a new socket and run the specified command "
+	       "detached,\n"
+	       "\t\t  and have dtach run in the foreground.\n"
+	       "  -p\t\tCopy the contents of standard input to the specified\n"
+	       "\t\t  socket.\n"
+	       "Options:\n"
+	       "  -e <char>\tSet the detach character to <char>, defaults "
+	       "to ^\\.\n"
+	       "  -E\t\tDisable the detach character.\n"
+	       "  -r <method>\tSet the redraw method to <method>. The "
+	       "valid methods are:\n"
+	       "\t\t     none: Don't redraw at all.\n"
+	       "\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
+	       "\t\t    winch: Send a WINCH signal to the program.\n"
+	       "  -z\t\tDisable processing of the suspend key.\n"
+	       "\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
 		PACKAGE_VERSION, __DATE__, __TIME__);
 	exit(0);
 }
@@ -143,7 +143,7 @@ main(int argc, char **argv)
 		else if (strncmp(*argv, "--version", strlen(*argv)) == 0)
 		{
 			printf("dtach - version %s, compiled on %s at %s.\n",
-				PACKAGE_VERSION, __DATE__, __TIME__);
+			       PACKAGE_VERSION, __DATE__, __TIME__);
 			return 0;
 		}
 
@@ -155,7 +155,7 @@ main(int argc, char **argv)
 		{
 			printf("%s: Invalid mode '-%c'\n", progname, mode);
 			printf("Try '%s --help' for more information.\n",
-				progname);
+			       progname);
 			return 1;
 		}
 	}
@@ -163,7 +163,7 @@ main(int argc, char **argv)
 	{
 		printf("%s: No mode was specified.\n", progname);
 		printf("Try '%s --help' for more information.\n",
-			progname);
+		       progname);
 		return 1;
 	}
 	++argv; --argc;
@@ -172,7 +172,7 @@ main(int argc, char **argv)
 	{
 		printf("%s: No socket was specified.\n", progname);
 		printf("Try '%s --help' for more information.\n",
-			progname);
+		       progname);
 		return 1;
 	}
 	sockname = *argv;
@@ -183,9 +183,9 @@ main(int argc, char **argv)
 		if (argc > 0)
 		{
 			printf("%s: Invalid number of arguments.\n",
-				progname);
+			       progname);
 			printf("Try '%s --help' for more information.\n",
-				progname);
+			       progname);
 			return 1;
 		}
 		return push_main();
@@ -195,7 +195,8 @@ main(int argc, char **argv)
 	{
 		char *p;
 
-		if (strcmp(argv[0], "--") == 0) {
+		if (strcmp(argv[0], "--") == 0)
+		{
 			++argv; --argc;
 			break;
 		}
@@ -212,9 +213,9 @@ main(int argc, char **argv)
 				if (argc < 1)
 				{
 					printf("%s: No escape character "
-						"specified.\n", progname);	
+					       "specified.\n", progname);
 					printf("Try '%s --help' for more "
-						"information.\n", progname);
+					       "information.\n", progname);
 					return 1;
 				}
 				if (argv[0][0] == '^' && argv[0][1])
@@ -234,9 +235,9 @@ main(int argc, char **argv)
 				if (argc < 1)
 				{
 					printf("%s: No redraw method "
-						"specified.\n", progname);	
+					       "specified.\n", progname);
 					printf("Try '%s --help' for more "
-						"information.\n", progname);
+					       "information.\n", progname);
 					return 1;
 				}
 				if (strcmp(argv[0], "none") == 0)
@@ -248,9 +249,9 @@ main(int argc, char **argv)
 				else
 				{
 					printf("%s: Invalid redraw method "
-						"specified.\n", progname);	
+					       "specified.\n", progname);
 					printf("Try '%s --help' for more "
-						"information.\n", progname);
+					       "information.\n", progname);
 					return 1;
 				}
 				break;
@@ -258,9 +259,9 @@ main(int argc, char **argv)
 			else
 			{
 				printf("%s: Invalid option '-%c'\n",
-					progname, *p);
+				       progname, *p);
 				printf("Try '%s --help' for more information.\n",
-					progname);
+				       progname);
 				return 1;
 			}
 		}
@@ -271,7 +272,7 @@ main(int argc, char **argv)
 	{
 		printf("%s: No command was specified.\n", progname);
 		printf("Try '%s --help' for more information.\n",
-			progname);
+		       progname);
 		return 1;
 	}
 
@@ -285,7 +286,7 @@ main(int argc, char **argv)
 	if (dont_have_tty && mode != 'n' && mode != 'N')
 	{
 		printf("%s: Attaching to a session requires a terminal.\n",
-			progname);
+		       progname);
 		return 1;
 	}
 
@@ -294,9 +295,9 @@ main(int argc, char **argv)
 		if (argc > 0)
 		{
 			printf("%s: Invalid number of arguments.\n",
-				progname);
+			       progname);
 			printf("Try '%s --help' for more information.\n",
-				progname);
+			       progname);
 			return 1;
 		}
 		return attach_main(0);
