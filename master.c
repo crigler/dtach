@@ -122,6 +122,7 @@ init_pty(char **argv, int statusfd)
 	else if (the_pty.pid == 0)
 	{
 		/* Child.. Execute the program. */
+		setenv("DTACH_SOCKET", sockname, 1);
 		execvp(*argv, argv);
 
 		/* Report the error to statusfd if we can, or stdout if we
