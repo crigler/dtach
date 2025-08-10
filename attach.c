@@ -32,6 +32,26 @@
 static struct termios cur_term;
 /* 1 if the window size changed */
 static int win_changed;
+/* Switch support: press DTACH_SWITCH_KEY to run DTACH_SWITCH_CMD which prints
+** a socket path (first line) to switch to. */
+static char switch_key;
+static char *switch_cmd;
+
+static void
+enter_raw_mode(void)
+{
+	cur_term = orig_term;
+	cur_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
+	cur_term.c_iflag &= ~(IXON|IXOFF);
+	cur_term.c_oflag &= ~(OPOST);
+	cur_term.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+	cur_term.c_cflag &= ~(CSIZE|PARENB);
+	cur_term.c_cflag |= CS8;
+	cur_term.c_cc[VLNEXT] = VDISABLE;
+	cur_term.c_cc[VMIN] = 1;
+	cur_term.c_cc[VTIME] = 0;
+	tcsetattr(0, TCSADRAIN, &cur_term);
+}
 
 /* Restores the original terminal settings. */
 static void
@@ -104,14 +124,93 @@ win_change(ATTRIBUTE_UNUSED int sig)
 
 /* Handles input from the keyboard. */
 static void
-process_kbd(int s, struct packet *pkt)
+process_kbd(int *ps, struct packet *pkt)
 {
+	/* Switch key: run external selector command to choose new socket. */
+	if (switch_key && switch_cmd && pkt->u.buf[0] == (unsigned char)switch_key)
+	{
+		char line[512];
+		char *nl;
+		int do_switch = 0;
+
+		/* Tell current master we are detaching while selecting. */
+		pkt->type = MSG_DETACH;
+		write_packet_or_fail(*ps, pkt);
+
+		/* Restore original terminal settings before running external command. */
+		// tcsetattr(0, TCSADRAIN, &orig_term);
+		// fflush(stdout);
+		restore_term();
+
+		FILE *fp = popen(switch_cmd, "r");
+		if (fp)
+		{
+			if (fgets(line, sizeof(line), fp))
+			{
+				nl = strpbrk(line, "\r\n");
+				if (nl) *nl = '\0';
+				/* Trim trailing spaces */
+				for (nl = line + strlen(line);
+					 nl > line && nl[-1] == ' '; --nl)
+					nl[-1] = '\0';
+				if (line[0] && strcmp(line, sockname) != 0)
+					do_switch = 1;
+			}
+			pclose(fp);
+		}
+
+		/* Re-enter raw mode. */
+		enter_raw_mode();
+
+		if (do_switch)
+		{
+			int newfd = connect_socket(line);
+			if (newfd >= 0)
+			{
+				close(*ps);
+				*ps = newfd;
+				sockname = strdup(line); /* update global */
+
+				/* Clear screen */
+				write_buf_or_fail(1, "\33[H\33[J", 6);
+
+				/* Attach handshake */
+				memset(pkt, 0, sizeof(*pkt));
+				pkt->type = MSG_ATTACH;
+				write_packet_or_fail(*ps, pkt);
+				pkt->type = MSG_REDRAW;
+				pkt->len = redraw_method;
+				ioctl(0, TIOCGWINSZ, &pkt->u.ws);
+				write_packet_or_fail(*ps, pkt);
+
+				printf(EOS "\r\n[switched to %s]\r\n", line);
+				fflush(stdout);
+				return;
+			}
+			else
+			{
+				printf(EOS "\r\n[switch failed: %s]\r\n",
+					   strerror(errno));
+			}
+		}
+
+		/* Reattach original session (or failed switch). */
+		memset(pkt, 0, sizeof(*pkt));
+		pkt->type = MSG_ATTACH;
+		write_packet_or_fail(*ps, pkt);
+		pkt->type = MSG_REDRAW;
+		pkt->len = redraw_method;
+		ioctl(0, TIOCGWINSZ, &pkt->u.ws);
+		write_packet_or_fail(*ps, pkt);
+		return;
+	}
+
 	/* Suspend? */
 	if (!no_suspend && (pkt->u.buf[0] == cur_term.c_cc[VSUSP]))
 	{
 		/* Tell the master that we are suspending. */
 		pkt->type = MSG_DETACH;
-		write_packet_or_fail(s, pkt);
+		write_packet_or_fail(*ps, pkt);
 
 		/* And suspend... */
 		tcsetattr(0, TCSADRAIN, &orig_term);
@@ -121,13 +220,13 @@ process_kbd(int s, struct packet *pkt)
 
 		/* Tell the master that we are returning. */
 		pkt->type = MSG_ATTACH;
-		write_packet_or_fail(s, pkt);
+		write_packet_or_fail(*ps, pkt);
 
 		/* We would like a redraw, too. */
 		pkt->type = MSG_REDRAW;
 		pkt->len = redraw_method;
 		ioctl(0, TIOCGWINSZ, &pkt->u.ws);
-		write_packet_or_fail(s, pkt);
+		write_packet_or_fail(*ps, pkt);
 		return;
 	}
 	/* Detach char? */
@@ -141,7 +240,7 @@ process_kbd(int s, struct packet *pkt)
 		win_changed = 1;
 
 	/* Push it out */
-	write_packet_or_fail(s, pkt);
+	write_packet_or_fail(*ps, pkt);
 }
 
 int
@@ -189,6 +288,14 @@ attach_main(int noerror)
 		return 1;
 	}
 
+	/* Read switch env vars (optional) */
+	{
+		char *k = getenv("DTACH_SWITCH_KEY");
+		char *c = getenv("DTACH_SWITCH_CMD");
+		if (k && k[0]) switch_key = k[0];
+		if (c && *c) switch_cmd = c;
+	}
+
 	/* The current terminal settings are equal to the original terminal
 	** settings at this point. */
 	cur_term = orig_term;
@@ -206,16 +313,7 @@ attach_main(int noerror)
 	signal(SIGWINCH, win_change);
 
 	/* Set raw mode. */
-	cur_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
-	cur_term.c_iflag &= ~(IXON|IXOFF);
-	cur_term.c_oflag &= ~(OPOST);
-	cur_term.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
-	cur_term.c_cflag &= ~(CSIZE|PARENB);
-	cur_term.c_cflag |= CS8;
-	cur_term.c_cc[VLNEXT] = VDISABLE;
-	cur_term.c_cc[VMIN] = 1;
-	cur_term.c_cc[VTIME] = 0;
-	tcsetattr(0, TCSADRAIN, &cur_term);
+	enter_raw_mode();
 
 	/* Clear the screen. This assumes VT100. */
 	write_buf_or_fail(1, "\33[H\33[J", 6);
@@ -279,7 +377,7 @@ attach_main(int noerror)
 				exit(1);
 
 			pkt.len = len;
-			process_kbd(s, &pkt);
+			process_kbd(&s, &pkt);
 			n--;
 		}
 
