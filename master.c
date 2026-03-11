@@ -53,6 +53,75 @@ static struct client *clients;
 /* The pseudo-terminal created for the child process. */
 static struct pty the_pty;
 
+/* Circular scrollback buffer for replaying output to newly attached clients. */
+static struct {
+	unsigned char *data;
+	size_t size;    /* Total capacity */
+	size_t used;    /* Bytes currently stored (up to size) */
+	size_t head;    /* Write position (next byte goes here) */
+} scrollback;
+
+/* Initialize the scrollback buffer. */
+static void
+init_scrollback(void)
+{
+	if (scrollback_size == 0)
+		return;
+	scrollback.data = malloc(scrollback_size);
+	if (!scrollback.data)
+	{
+		scrollback.size = 0;
+		return;
+	}
+	scrollback.size = scrollback_size;
+	scrollback.used = 0;
+	scrollback.head = 0;
+}
+
+/* Append data to the scrollback buffer. */
+static void
+scrollback_push(const unsigned char *buf, size_t len)
+{
+	size_t i;
+
+	if (!scrollback.data || scrollback.size == 0)
+		return;
+
+	for (i = 0; i < len; i++)
+	{
+		scrollback.data[scrollback.head] = buf[i];
+		scrollback.head = (scrollback.head + 1) % scrollback.size;
+		if (scrollback.used < scrollback.size)
+			scrollback.used++;
+	}
+}
+
+/* Replay the scrollback buffer contents to a file descriptor. */
+static void
+scrollback_replay(int fd)
+{
+	size_t start, count;
+
+	if (!scrollback.data || scrollback.used == 0)
+		return;
+
+	if (scrollback.used < scrollback.size)
+	{
+		/* Buffer hasn't wrapped yet - data starts at 0 */
+		write_buf_or_fail(fd, scrollback.data, scrollback.used);
+	}
+	else
+	{
+		/* Buffer has wrapped - oldest data starts at head */
+		start = scrollback.head;
+		count = scrollback.size - start;
+		if (count > 0)
+			write_buf_or_fail(fd, scrollback.data + start, count);
+		if (start > 0)
+			write_buf_or_fail(fd, scrollback.data, start);
+	}
+}
+
 #ifndef HAVE_FORKPTY
 pid_t forkpty(int *amaster, char *name, struct termios *termp,
 	      struct winsize *winp);
@@ -272,6 +341,9 @@ pty_activity(int s)
 		exit(1);
 	}
 
+	/* Capture output into the scrollback buffer for later replay. */
+	scrollback_push(buf, len);
+
 #ifdef BROKEN_MASTER
 	/* Get the current terminal settings. */
 	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
@@ -398,7 +470,20 @@ client_activity(struct client *p)
 
 	/* Attach or detach from the program. */
 	else if (pkt.type == MSG_ATTACH)
+	{
+		/* Replay scrollback buffer so the client has context.
+		** Wrap the replay in OSC delimiters so smart clients can
+		** distinguish replayed content from live PTY output.
+		** Unknown OSC sequences are silently ignored by terminals. */
+		static const char replay_start[] =
+			"\033]dtach-rev;replay-start\007";
+		static const char replay_end[] =
+			"\033]dtach-rev;replay-end\007";
+		write_buf_or_fail(p->fd, replay_start, sizeof(replay_start) - 1);
+		scrollback_replay(p->fd);
+		write_buf_or_fail(p->fd, replay_end, sizeof(replay_end) - 1);
 		p->attached = 1;
+	}
 	else if (pkt.type == MSG_DETACH)
 		p->attached = 0;
 
@@ -498,6 +583,9 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	dup2(nullfd, 2);
 	if (nullfd > 2)
 		close(nullfd);
+
+	/* Initialize the scrollback buffer for output replay. */
+	init_scrollback();
 
 	/* Loop forever. */
 	while (1)

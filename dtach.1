@@ -164,6 +164,25 @@ redraw method for the session. If not specified, the
 method is used.
 
 .TP
+.BI "\-b " "<size>"
+Sets the scrollback buffer size to
+.IR <size>
+bytes. When a new client attaches to a session, the contents of the
+scrollback buffer are replayed to the client, providing context of
+recent output. The
+.I <size>
+argument accepts optional
+.B K
+or
+.B M
+suffixes for kilobytes and megabytes respectively (e.g.
+.BR 256K ,
+.BR 1M ).
+Set to
+.B 0
+to disable the scrollback buffer. The default size is 256K.
+
+.TP
 .B \-z
 Disables processing of the suspend key.
 Normally,

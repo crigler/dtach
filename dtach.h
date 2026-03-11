@@ -97,6 +97,7 @@ extern char *progname, *sockname;
 extern int detach_char, no_suspend, redraw_method;
 extern struct termios orig_term;
 extern int dont_have_tty;
+extern size_t scrollback_size;
 
 enum
 {
@@ -105,6 +106,7 @@ enum
 	MSG_DETACH	= 2,
 	MSG_WINCH	= 3,
 	MSG_REDRAW	= 4,
+	MSG_CONTENT	= 5,
 };
 
 enum
@@ -135,6 +137,9 @@ struct packet
 ** buffer used for the text stream.
 */
 #define BUFSIZE 4096
+
+/* Default scrollback buffer size (256KB). Set to 0 to disable. */
+#define DEFAULT_SCROLLBACK_SIZE (256 * 1024)
 
 /* This hopefully moves to the bottom of the screen */
 #define EOS "\033[999H"

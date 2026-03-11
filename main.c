@@ -36,6 +36,8 @@ int detach_char = '\\' - 64;
 int no_suspend;
 /* The default redraw method. Initially set to unspecified. */
 int redraw_method = REDRAW_UNSPEC;
+/* The scrollback buffer size. */
+size_t scrollback_size = DEFAULT_SCROLLBACK_SIZE;
 
 /*
 ** The original terminal settings. Shared between the master and attach
@@ -120,6 +122,9 @@ usage()
 	       "\t\t     none: Don't redraw at all.\n"
 	       "\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
 	       "\t\t    winch: Send a WINCH signal to the program.\n"
+	       "  -b <size>\tSet the scrollback buffer size in bytes.\n"
+	       "\t\t  Suffixes K and M are supported (e.g. 256K, 1M).\n"
+	       "\t\t  Set to 0 to disable. Default: 256K.\n"
 	       "  -z\t\tDisable processing of the suspend key.\n"
 	       "\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
 		PACKAGE_VERSION, __DATE__, __TIME__);
@@ -254,6 +259,36 @@ main(int argc, char **argv)
 					       "information.\n", progname);
 					return 1;
 				}
+				break;
+			}
+			else if (*p == 'b')
+			{
+				char *end;
+				unsigned long val;
+
+				++argv; --argc;
+				if (argc < 1)
+				{
+					printf("%s: No scrollback size "
+					       "specified.\n", progname);
+					printf("Try '%s --help' for more "
+					       "information.\n", progname);
+					return 1;
+				}
+				val = strtoul(argv[0], &end, 10);
+				if (*end == 'k' || *end == 'K')
+					val *= 1024;
+				else if (*end == 'm' || *end == 'M')
+					val *= 1024 * 1024;
+				else if (*end != '\0')
+				{
+					printf("%s: Invalid scrollback size "
+					       "'%s'.\n", progname, argv[0]);
+					printf("Try '%s --help' for more "
+					       "information.\n", progname);
+					return 1;
+				}
+				scrollback_size = (size_t)val;
 				break;
 			}
 			else

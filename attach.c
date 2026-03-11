@@ -217,10 +217,9 @@ attach_main(int noerror)
 	cur_term.c_cc[VTIME] = 0;
 	tcsetattr(0, TCSADRAIN, &cur_term);
 
-	/* Clear the screen. This assumes VT100. */
-	write_buf_or_fail(1, "\33[H\33[J", 6);
-
-	/* Tell the master that we want to attach. */
+	/* Tell the master that we want to attach. The master will replay
+	** the scrollback buffer before marking us as attached, so we skip
+	** the old screen clear to preserve the replayed content. */
 	memset(&pkt, 0, sizeof(struct packet));
 	pkt.type = MSG_ATTACH;
 	write_packet_or_fail(s, &pkt);
