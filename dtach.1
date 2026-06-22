@@ -164,6 +164,13 @@ redraw method for the session. If not specified, the
 method is used.
 
 .TP
+.BI "\-H " "<bytes>"
+Sets the number of bytes of program output history retained in memory and
+replayed to newly attached clients. The default is 1048576 bytes. A value of
+0 disables history replay. The setting only affects newly created sessions;
+attaching to an existing session uses that session's configured history size.
+
+.TP
 .B \-z
 Disables processing of the suspend key.
 Normally,

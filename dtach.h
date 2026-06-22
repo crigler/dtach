@@ -95,6 +95,7 @@
 
 extern char *progname, *sockname;
 extern int detach_char, no_suspend, redraw_method;
+extern size_t history_size;
 extern struct termios orig_term;
 extern int dont_have_tty;
 

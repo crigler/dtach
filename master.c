@@ -53,6 +53,34 @@ static struct client *clients;
 /* The pseudo-terminal created for the child process. */
 static struct pty the_pty;
 
+struct history
+{
+	unsigned char *buf;
+	size_t cap;
+	size_t start;
+	size_t len;
+};
+
+enum history_filter_state
+{
+	HIST_FILTER_NORMAL,
+	HIST_FILTER_ESC,
+	HIST_FILTER_CSI,
+	HIST_FILTER_OSC,
+	HIST_FILTER_OSC_ESC
+};
+
+struct history_filter
+{
+	enum history_filter_state state;
+	unsigned char seq[4096];
+	size_t len;
+	int has_query;
+};
+
+static struct history output_history;
+static struct history_filter output_history_filter;
+
 #ifndef HAVE_FORKPTY
 pid_t forkpty(int *amaster, char *name, struct termios *termp,
 	      struct winsize *winp);
@@ -63,6 +91,222 @@ static void
 unlink_socket(void)
 {
 	unlink(sockname);
+}
+
+static void
+close_client(struct client *p)
+{
+	close(p->fd);
+	if (p->next)
+		p->next->pprev = p->pprev;
+	*(p->pprev) = p->next;
+	free(p);
+}
+
+static int
+init_history(void)
+{
+	memset(&output_history, 0, sizeof(output_history));
+	if (history_size == 0)
+		return 0;
+
+	output_history.buf = malloc(history_size);
+	if (!output_history.buf)
+		return -1;
+	output_history.cap = history_size;
+	return 0;
+}
+
+static void
+history_append_raw(const unsigned char *buf, size_t len)
+{
+	size_t end, first;
+
+	if (output_history.cap == 0 || len == 0)
+		return;
+
+	if (len >= output_history.cap)
+	{
+		memcpy(output_history.buf, buf + len - output_history.cap,
+		       output_history.cap);
+		output_history.start = 0;
+		output_history.len = output_history.cap;
+		return;
+	}
+
+	if (output_history.len + len > output_history.cap)
+	{
+		size_t drop = output_history.len + len - output_history.cap;
+
+		output_history.start = (output_history.start + drop) %
+		                       output_history.cap;
+		output_history.len -= drop;
+	}
+
+	end = (output_history.start + output_history.len) % output_history.cap;
+	first = output_history.cap - end;
+	if (first > len)
+		first = len;
+	memcpy(output_history.buf + end, buf, first);
+	if (len > first)
+		memcpy(output_history.buf, buf + first, len - first);
+	output_history.len += len;
+}
+
+static void
+history_filter_reset(void)
+{
+	output_history_filter.state = HIST_FILTER_NORMAL;
+	output_history_filter.len = 0;
+	output_history_filter.has_query = 0;
+}
+
+static void
+history_filter_buffer(unsigned char c)
+{
+	if (output_history_filter.len < sizeof(output_history_filter.seq))
+		output_history_filter.seq[output_history_filter.len++] = c;
+}
+
+static void
+history_filter_flush(void)
+{
+	history_append_raw(output_history_filter.seq, output_history_filter.len);
+	history_filter_reset();
+}
+
+static void
+history_filter_finish_osc(void)
+{
+	if (!output_history_filter.has_query)
+		history_append_raw(output_history_filter.seq,
+		                   output_history_filter.len);
+	history_filter_reset();
+}
+
+static void
+history_filter_finish_csi(unsigned char final)
+{
+	if (final != 'n')
+		history_append_raw(output_history_filter.seq,
+		                   output_history_filter.len);
+	history_filter_reset();
+}
+
+static void
+history_append(const unsigned char *buf, size_t len)
+{
+	size_t i;
+
+	if (output_history.cap == 0 || len == 0)
+		return;
+
+	for (i = 0; i < len; i++)
+	{
+		unsigned char c = buf[i];
+
+		switch (output_history_filter.state)
+		{
+		case HIST_FILTER_NORMAL:
+			if (c == '\033')
+			{
+				history_filter_reset();
+				history_filter_buffer(c);
+				output_history_filter.state = HIST_FILTER_ESC;
+			}
+			else
+				history_append_raw(&c, 1);
+			break;
+
+		case HIST_FILTER_ESC:
+			history_filter_buffer(c);
+			if (c == ']')
+				output_history_filter.state = HIST_FILTER_OSC;
+			else if (c == '[')
+				output_history_filter.state = HIST_FILTER_CSI;
+			else
+				history_filter_flush();
+			break;
+
+		case HIST_FILTER_CSI:
+			history_filter_buffer(c);
+			if (c >= 0x40 && c <= 0x7e)
+				history_filter_finish_csi(c);
+			break;
+
+		case HIST_FILTER_OSC:
+			history_filter_buffer(c);
+			if (c == '?')
+				output_history_filter.has_query = 1;
+			if (c == '\007')
+				history_filter_finish_osc();
+			else if (c == '\033')
+				output_history_filter.state = HIST_FILTER_OSC_ESC;
+			break;
+
+		case HIST_FILTER_OSC_ESC:
+			history_filter_buffer(c);
+			if (c == '\\')
+				history_filter_finish_osc();
+			else
+				output_history_filter.state = HIST_FILTER_OSC;
+			break;
+		}
+
+		if (output_history_filter.len == sizeof(output_history_filter.seq))
+			history_filter_flush();
+	}
+}
+
+static int
+write_client_buf(int fd, const unsigned char *buf, size_t len)
+{
+	while (len != 0)
+	{
+		ssize_t ret = write(fd, buf, len);
+
+		if (ret > 0)
+		{
+			buf += ret;
+			len -= ret;
+		}
+		else if (ret < 0 && errno == EINTR)
+			continue;
+		else if (ret < 0 && errno == EAGAIN)
+		{
+			fd_set writefds;
+
+			FD_ZERO(&writefds);
+			FD_SET(fd, &writefds);
+			if (select(fd + 1, NULL, &writefds, NULL, NULL) < 0 &&
+			    errno != EINTR)
+				return -1;
+		}
+		else
+			return -1;
+	}
+	return 0;
+}
+
+static int
+history_replay(int fd)
+{
+	size_t first;
+
+	if (output_history.len == 0)
+		return 0;
+
+	first = output_history.cap - output_history.start;
+	if (first > output_history.len)
+		first = output_history.len;
+	if (write_client_buf(fd, output_history.buf + output_history.start,
+	                     first) < 0)
+		return -1;
+	if (output_history.len > first &&
+	    write_client_buf(fd, output_history.buf,
+	                     output_history.len - first) < 0)
+		return -1;
+	return 0;
 }
 
 /* Signal */
@@ -272,6 +516,8 @@ pty_activity(int s)
 		exit(1);
 	}
 
+	history_append(buf, len);
+
 #ifdef BROKEN_MASTER
 	/* Get the current terminal settings. */
 	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
@@ -357,6 +603,11 @@ control_activity(int s)
 
 	/* Link it in. */
 	p = malloc(sizeof(struct client));
+	if (!p)
+	{
+		close(fd);
+		return;
+	}
 	p->fd = fd;
 	p->attached = 0;
 	p->pprev = &clients;
@@ -381,11 +632,7 @@ client_activity(struct client *p)
 	/* Close the client on an error. */
 	if (len != sizeof(struct packet))
 	{
-		close(p->fd);
-		if (p->next)
-			p->next->pprev = p->pprev;
-		*(p->pprev) = p->next;
-		free(p);
+		close_client(p);
 		return;
 	}
 
@@ -398,7 +645,11 @@ client_activity(struct client *p)
 
 	/* Attach or detach from the program. */
 	else if (pkt.type == MSG_ATTACH)
+	{
 		p->attached = 1;
+		if (history_replay(p->fd) < 0)
+			close_client(p);
+	}
 	else if (pkt.type == MSG_DETACH)
 		p->attached = 0;
 
@@ -576,6 +827,12 @@ master_main(char **argv, int waitattach, int dontfork)
 	/* Use a default redraw method if one hasn't been specified yet. */
 	if (redraw_method == REDRAW_UNSPEC)
 		redraw_method = REDRAW_CTRL_L;
+
+	if (init_history() < 0)
+	{
+		printf("%s: history buffer: %s\n", progname, strerror(errno));
+		return 1;
+	}
 
 	/* Create the unix domain socket. */
 	s = create_socket(sockname);
