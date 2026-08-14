@@ -46,7 +46,26 @@ struct client
 	int fd;
 	/* Whether or not the client is attached. */
 	int attached;
+	/* Output that the client's socket would not take yet. Upstream dtach
+	** discarded this; we hold on to it instead. */
+	unsigned char *pending;
+	size_t pending_len;
+	size_t pending_cap;
 };
+
+/*
+** How much output we are willing to buffer for a client that is not keeping
+** up. Past this we stop reading the pty, so the program blocks instead of us
+** either dropping its output or growing without bound.
+**
+** Sized so that a client which stops reading for a long stretch -- a web
+** client whose browser tab is backgrounded, say -- does not stall the program
+** in practice. We do NOT disconnect such a client on a timer: it is generally
+** alive and will drain when it comes back, and killing it is far more
+** disruptive than making the program wait. A client that is genuinely gone is
+** detected properly, by its socket erroring on write.
+*/
+#define MAX_PENDING (8 * 1024 * 1024)
 
 /* The list of connected clients. */
 static struct client *clients;
@@ -245,16 +264,97 @@ update_socket_modes(int exec)
 		chmod(sockname, newmode);
 }
 
+/* Unlink a client from the list and release it. */
+static void
+client_free(struct client *p)
+{
+	close(p->fd);
+	if (p->next)
+		p->next->pprev = p->pprev;
+	*(p->pprev) = p->next;
+	free(p->pending);
+	free(p);
+}
+
+/* Discard whatever a client has not received yet. Used when it detaches: the
+** data describes a screen it is no longer looking at, and it gets a redraw
+** when it comes back. */
+static void
+client_drop_pending(struct client *p)
+{
+	free(p->pending);
+	p->pending = NULL;
+	p->pending_len = 0;
+	p->pending_cap = 0;
+}
+
+/* Append data to a client's pending buffer. Returns -1 if it cannot be
+** stored, which we treat as a dead client rather than as a licence to drop
+** the data. */
+static int
+client_queue(struct client *p, unsigned char *buf, size_t len)
+{
+	size_t need = p->pending_len + len;
+
+	if (need > p->pending_cap)
+	{
+		size_t cap = p->pending_cap ? p->pending_cap : BUFSIZE;
+		unsigned char *tmp;
+
+		while (cap < need)
+			cap *= 2;
+		tmp = realloc(p->pending, cap);
+		if (!tmp)
+			return -1;
+		p->pending = tmp;
+		p->pending_cap = cap;
+	}
+	memcpy(p->pending + p->pending_len, buf, len);
+	p->pending_len = need;
+	return 0;
+}
+
+/* Write as much of a client's pending buffer as its socket will take right
+** now. Returns -1 if the client died. */
+static int
+client_flush(struct client *p)
+{
+	size_t off = 0;
+
+	while (off < p->pending_len)
+	{
+		ssize_t n = write(p->fd, p->pending + off,
+			p->pending_len - off);
+
+		if (n > 0)
+		{
+			off += n;
+			continue;
+		}
+		else if (n < 0 && errno == EINTR)
+			continue;
+		else if (n < 0 && errno == EAGAIN)
+			break;
+		else
+			return -1;
+	}
+	if (off > 0)
+	{
+		p->pending_len -= off;
+		if (p->pending_len > 0)
+			memmove(p->pending, p->pending + off, p->pending_len);
+	}
+	return 0;
+}
+
 /* Process activity on the pty - Input and terminal changes are sent out to
 ** the attached clients. If the pty goes away, we die. */
 static void
-pty_activity(int s)
+pty_activity(void)
 {
 	unsigned char buf[BUFSIZE];
 	ssize_t len;
-	struct client *p;
-	fd_set readfds, writefds;
-	int highest_fd, nclients;
+	struct client *p, *next;
 
 	/* Read the pty activity */
 	len = read(the_pty.fd, buf, sizeof(buf));
@@ -282,60 +382,24 @@ pty_activity(int s)
 		exit(1);
 #endif
 
-top:
 	/*
-	** Wait until at least one client is writable. Also wait on the control
-	** socket in case a new client tries to connect.
+	** Hand the data to every attached client and push out as much of each
+	** one's backlog as its socket will take. Whatever does not fit stays
+	** queued; the main loop stops reading the pty once a client is at
+	** MAX_PENDING, so nothing is ever discarded.
 	*/
-	FD_ZERO(&readfds);
-	FD_ZERO(&writefds);
-	FD_SET(s, &readfds);
-	highest_fd = s;
-	for (p = clients, nclients = 0; p; p = p->next)
+	for (p = clients; p; p = next)
 	{
+		next = p->next;
 		if (!p->attached)
 			continue;
-		FD_SET(p->fd, &writefds);
-		if (p->fd > highest_fd)
-			highest_fd = p->fd;
-		nclients++;
-	}
-	if (nclients == 0)
-		return;
-	if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
-		return;
 
-	/* Send the data out to the clients. */
-	for (p = clients, nclients = 0; p; p = p->next)
-	{
-		ssize_t written;
-
-		if (!FD_ISSET(p->fd, &writefds))
-			continue;
-
-		written = 0;
-		while (written < len)
+		if (client_queue(p, buf, len) < 0 || client_flush(p) < 0)
 		{
-			ssize_t n = write(p->fd, buf + written, len - written);
-
-			if (n > 0)
-			{
-				written += n;
-				continue;
-			}
-			else if (n < 0 && errno == EINTR)
-				continue;
-			else if (n < 0 && errno != EAGAIN)
-				nclients = -1;
-			break;
+			client_free(p);
+			continue;
 		}
-		if (nclients != -1 && written == len)
-			nclients++;
 	}
-
-	/* Try again if nothing happened. */
-	if (!FD_ISSET(s, &readfds) && nclients == 0)
-		goto top;
 }
 
 /* Process activity on the control socket */
@@ -359,6 +423,9 @@ control_activity(int s)
 	p = malloc(sizeof(struct client));
 	p->fd = fd;
 	p->attached = 0;
+	p->pending = NULL;
+	p->pending_len = 0;
+	p->pending_cap = 0;
 	p->pprev = &clients;
 	p->next = *(p->pprev);
 	if (p->next)
@@ -381,11 +448,7 @@ client_activity(struct client *p)
 	/* Close the client on an error. */
 	if (len != sizeof(struct packet))
 	{
-		close(p->fd);
-		if (p->next)
-			p->next->pprev = p->pprev;
-		*(p->pprev) = p->next;
-		free(p);
+		client_free(p);
 		return;
 	}
 
@@ -400,7 +463,10 @@ client_activity(struct client *p)
 	else if (pkt.type == MSG_ATTACH)
 		p->attached = 1;
 	else if (pkt.type == MSG_DETACH)
+	{
 		p->attached = 0;
+		client_drop_pending(p);
+	}
 
 	/* Window size change request, without a forced redraw. */
 	else if (pkt.type == MSG_WINCH)
@@ -451,7 +517,7 @@ static void
 master_process(int s, char **argv, int waitattach, int statusfd)
 {
 	struct client *p, *next;
-	fd_set readfds;
+	fd_set readfds, writefds;
 	int highest_fd;
 	int nullfd;
 
@@ -503,27 +569,13 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	while (1)
 	{
 		int new_has_attached_client = 0;
+		int backlogged = 0;
 
 		/* Re-initialize the file descriptor set for select. */
 		FD_ZERO(&readfds);
+		FD_ZERO(&writefds);
 		FD_SET(s, &readfds);
 		highest_fd = s;
-
-		/*
-		** When waitattach is set, wait until the client attaches
-		** before trying to read from the pty.
-		*/
-		if (waitattach)
-		{
-			if (clients && clients->attached)
-				waitattach = 0;
-		}
-		else
-		{
-			FD_SET(the_pty.fd, &readfds);
-			if (the_pty.fd > highest_fd)
-				highest_fd = the_pty.fd;
-		}
 
 		for (p = clients; p; p = p->next)
 		{
@@ -531,8 +583,34 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 			if (p->fd > highest_fd)
 				highest_fd = p->fd;
 
+			/* Anything still queued for this client? */
+			if (p->pending_len > 0)
+			{
+				FD_SET(p->fd, &writefds);
+				if (p->pending_len >= MAX_PENDING)
+					backlogged = 1;
+			}
+
 			if (p->attached)
 				new_has_attached_client = 1;
+		}
+
+		/*
+		** When waitattach is set, wait until the client attaches
+		** before trying to read from the pty. We also stop reading
+		** while a client is at its buffer limit, which pushes back on
+		** the program rather than losing its output.
+		*/
+		if (waitattach)
+		{
+			if (clients && clients->attached)
+				waitattach = 0;
+		}
+		else if (!backlogged)
+		{
+			FD_SET(the_pty.fd, &readfds);
+			if (the_pty.fd > highest_fd)
+				highest_fd = the_pty.fd;
 		}
 
 		/* chmod the socket if necessary. */
@@ -543,7 +621,7 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 		}
 
 		/* Wait for something to happen. */
-		if (select(highest_fd + 1, &readfds, NULL, NULL, NULL) < 0)
+		if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 		{
 			if (errno == EINTR || errno == EAGAIN)
 				continue;
@@ -553,6 +631,16 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 		/* New client? */
 		if (FD_ISSET(s, &readfds))
 			control_activity(s);
+		/* Drain queued output to the clients that can take it now. */
+		for (p = clients; p; p = next)
+		{
+			next = p->next;
+			if (FD_ISSET(p->fd, &writefds) && client_flush(p) < 0)
+			{
+				client_free(p);
+				continue;
+			}
+		}
 		/* Activity on a client? */
 		for (p = clients; p; p = next)
 		{
@@ -561,8 +649,8 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 				client_activity(p);
 		}
 		/* pty activity? */
-		if (FD_ISSET(the_pty.fd, &readfds))
-			pty_activity(s);
+		if (!backlogged && FD_ISSET(the_pty.fd, &readfds))
+			pty_activity();
 	}
 }
 
