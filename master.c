@@ -51,25 +51,21 @@ struct client
 	unsigned char *pending;
 	size_t pending_len;
 	size_t pending_cap;
-	/* When the client first filled its pending buffer, or 0 if it is
-	** keeping up. Used to disconnect a client that has wedged. */
-	time_t stalled_since;
 };
 
 /*
 ** How much output we are willing to buffer for a client that is not keeping
 ** up. Past this we stop reading the pty, so the program blocks instead of us
 ** either dropping its output or growing without bound.
+**
+** Sized so that a client which stops reading for a long stretch -- a web
+** client whose browser tab is backgrounded, say -- does not stall the program
+** in practice. We do NOT disconnect such a client on a timer: it is generally
+** alive and will drain when it comes back, and killing it is far more
+** disruptive than making the program wait. A client that is genuinely gone is
+** detected properly, by its socket erroring on write.
 */
-#define MAX_PENDING (1024 * 1024)
-
-/*
-** How long a client may sit at MAX_PENDING without accepting a single byte
-** before we presume it is dead and disconnect it, so one wedged client cannot
-** stall the session for the rest. The timer is reset by any write progress,
-** so this distinguishes a dead client from a merely slow one.
-*/
-#define STALL_TIMEOUT 3
+#define MAX_PENDING (8 * 1024 * 1024)
 
 /* The list of connected clients. */
 static struct client *clients;
@@ -290,7 +286,6 @@ client_drop_pending(struct client *p)
 	p->pending = NULL;
 	p->pending_len = 0;
 	p->pending_cap = 0;
-	p->stalled_since = 0;
 }
 
 /* Append data to a client's pending buffer. Returns -1 if it cannot be
@@ -348,32 +343,8 @@ client_flush(struct client *p)
 		p->pending_len -= off;
 		if (p->pending_len > 0)
 			memmove(p->pending, p->pending + off, p->pending_len);
-		/* It took something, so it is slow, not dead. */
-		p->stalled_since = 0;
 	}
 	return 0;
-}
-
-/* Disconnect a client that has been unable to accept output for too long.
-** Returns 1 if the client was freed. */
-static int
-client_check_stall(struct client *p)
-{
-	if (p->pending_len < MAX_PENDING)
-	{
-		p->stalled_since = 0;
-		return 0;
-	}
-	if (p->stalled_since == 0)
-	{
-		p->stalled_since = time(NULL);
-		return 0;
-	}
-	if (time(NULL) - p->stalled_since < STALL_TIMEOUT)
-		return 0;
-
-	client_free(p);
-	return 1;
 }
 
 /* Process activity on the pty - Input and terminal changes are sent out to
@@ -428,7 +399,6 @@ pty_activity(void)
 			client_free(p);
 			continue;
 		}
-		client_check_stall(p);
 	}
 }
 
@@ -456,7 +426,6 @@ control_activity(int s)
 	p->pending = NULL;
 	p->pending_len = 0;
 	p->pending_cap = 0;
-	p->stalled_since = 0;
 	p->pprev = &clients;
 	p->next = *(p->pprev);
 	if (p->next)
@@ -601,7 +570,6 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 	{
 		int new_has_attached_client = 0;
 		int backlogged = 0;
-		struct timeval tv, *tvp;
 
 		/* Re-initialize the file descriptor set for select. */
 		FD_ZERO(&readfds);
@@ -652,20 +620,8 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 			has_attached_client = new_has_attached_client;
 		}
 
-		/*
-		** Wait for something to happen. While a client is at its
-		** buffer limit we wake up periodically, so a client that has
-		** wedged for good can be timed out instead of holding the
-		** pty closed forever.
-		*/
-		tvp = NULL;
-		if (backlogged)
-		{
-			tv.tv_sec = 1;
-			tv.tv_usec = 0;
-			tvp = &tv;
-		}
-		if (select(highest_fd + 1, &readfds, &writefds, NULL, tvp) < 0)
+		/* Wait for something to happen. */
+		if (select(highest_fd + 1, &readfds, &writefds, NULL, NULL) < 0)
 		{
 			if (errno == EINTR || errno == EAGAIN)
 				continue;
@@ -684,7 +640,6 @@ master_process(int s, char **argv, int waitattach, int statusfd)
 				client_free(p);
 				continue;
 			}
-			client_check_stall(p);
 		}
 		/* Activity on a client? */
 		for (p = clients; p; p = next)
