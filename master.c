@@ -443,6 +443,25 @@ client_activity(struct client *p)
 			killpty(&the_pty, SIGWINCH);
 		}
 	}
+
+	/* The UTF-8 state of the attaching terminal. */
+	else if (pkt.type == MSG_TTY)
+	{
+#ifdef IUTF8
+		if (pkt.len == 1)
+		{
+			if (pkt.u.buf[0])
+				the_pty.term.c_iflag |= IUTF8;
+			else
+				the_pty.term.c_iflag &= ~IUTF8;
+# ifdef BROKEN_MASTER
+			tcsetattr(the_pty.slave, TCSADRAIN, &the_pty.term);
+# else
+			tcsetattr(the_pty.fd, TCSADRAIN, &the_pty.term);
+# endif
+		}
+#endif
+	}
 }
 
 /* The master process - It watches over the pty process and the attached */

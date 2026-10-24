@@ -55,6 +55,13 @@ attached terminals; it instead relies on the ability of the attached terminals
 to manage the screen.
 .PP
 
+When attaching,
+.B dtach
+informs the session about whether or not the attaching terminal is using
+UTF-8, so that the line discipline in the session can erase multi-byte
+characters correctly.
+.PP
+
 Sessions are represented by Unix-domain sockets in the filesystem. No other
 permission checking other than the filesystem access checks is performed.
 .B dtach

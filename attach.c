@@ -225,6 +225,15 @@ attach_main(int noerror)
 	pkt.type = MSG_ATTACH;
 	write_packet_or_fail(s, &pkt);
 
+	/* Tell the master whether or not we are using UTF-8, so that
+	** multi-byte characters can be erased properly. */
+#ifdef IUTF8
+	pkt.type = MSG_TTY;
+	pkt.len = 1;
+	pkt.u.buf[0] = (orig_term.c_iflag & IUTF8) ? 1 : 0;
+	write_packet_or_fail(s, &pkt);
+#endif
+
 	/* We would like a redraw, too. */
 	pkt.type = MSG_REDRAW;
 	pkt.len = redraw_method;

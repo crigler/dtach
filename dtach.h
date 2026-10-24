@@ -105,6 +105,7 @@ enum
 	MSG_DETACH	= 2,
 	MSG_WINCH	= 3,
 	MSG_REDRAW	= 4,
+	MSG_TTY		= 5,
 };
 
 enum
