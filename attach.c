@@ -40,8 +40,35 @@ restore_term(void)
 {
 	tcsetattr(0, TCSADRAIN, &orig_term);
 
-	/* Make cursor visible. Assumes VT100. */
-	printf("\033[?25h");
+	/* Undo the modes the program may have set */
+	printf(
+		/* synchronized output */
+		"\033[?2026l"
+		/* mouse clicks */
+		"\033[?1000l"
+		/* mouse drags */
+		"\033[?1002l"
+		/* all mouse motion */
+		"\033[?1003l"
+		/* focus reporting */
+		"\033[?1004l"
+		/* SGR mouse coordinates */
+		"\033[?1006l"
+		/* bracketed paste */
+		"\033[?2004l"
+		/* Kitty keyboard protocol */
+		"\033[<u"
+		/* modifyOtherKeys */
+		"\033[>4;0m"
+		/* line wrap */
+		"\033[?7h"
+		/* attributes */
+		"\033[0m"
+		/* main screen */
+		"\033[?1049l"
+		/* cursor (assumes VT100) */
+		"\033[?25h"
+	);
 	fflush(stdout);
 }
 
