@@ -33,15 +33,48 @@ static struct termios cur_term;
 /* 1 if the window size changed */
 static int win_changed;
 
-/* Restores the original terminal settings. */
+/*
+** Writes a buffer using only async-signal-safe calls. Unlike
+** write_buf_or_fail, errors are ignored: this is used while exiting, often
+** after the terminal has hung up, and must not call stdio or exit().
+*/
+static void
+write_buf_signal_safe(int fd, const char *buf, size_t count)
+{
+	while (count != 0)
+	{
+		ssize_t ret = write(fd, buf, count);
+
+		if (ret > 0)
+		{
+			buf += ret;
+			count -= ret;
+		}
+		else if (ret < 0 && errno == EINTR)
+			continue;
+		else
+			break;
+	}
+}
+
+/* Writes a string using only async-signal-safe calls. */
+static void
+write_str_signal_safe(const char *str)
+{
+	write_buf_signal_safe(1, str, strlen(str));
+}
+
+/*
+** Restores the original terminal settings. This runs from atexit() and
+** from the die() signal handler, so it only uses async-signal-safe calls.
+*/
 static void
 restore_term(void)
 {
 	tcsetattr(0, TCSADRAIN, &orig_term);
 
 	/* Make cursor visible. Assumes VT100. */
-	printf("\033[?25h");
-	fflush(stdout);
+	write_str_signal_safe("\033[?25h");
 }
 
 /* Connects to a unix domain socket */
@@ -82,16 +115,40 @@ connect_socket(char *name)
 	return s;
 }
 
-/* Signal */
+/*
+** Signal handler for SIGHUP, SIGTERM, SIGINT and SIGQUIT.
+**
+** printf() and exit() are not async-signal-safe. If the signal arrives while
+** the main program is inside stdio or malloc, for example in restore_term()
+** running from exit() after the terminal hangs up, calling them again here
+** can corrupt the heap and crash. Use write() and _exit() instead, and
+** restore the terminal directly since _exit() skips the atexit handlers.
+*/
 static RETSIGTYPE
 die(int sig)
 {
 	/* Print a nice pretty message for some things. */
 	if (sig == SIGHUP || sig == SIGINT)
-		printf(EOS "\r\n[detached]\r\n");
+		write_str_signal_safe(EOS "\r\n[detached]\r\n");
 	else
-		printf(EOS "\r\n[got signal %d - dying]\r\n", sig);
-	exit(1);
+	{
+		char num[12];
+		size_t i = sizeof(num);
+		unsigned int n = (unsigned int)sig;
+
+		/* Format the signal number without printf. */
+		do
+		{
+			num[--i] = '0' + n % 10;
+			n /= 10;
+		} while (n != 0 && i > 0);
+
+		write_str_signal_safe(EOS "\r\n[got signal ");
+		write_buf_signal_safe(1, num + i, sizeof(num) - i);
+		write_str_signal_safe(" - dying]\r\n");
+	}
+	restore_term();
+	_exit(1);
 }
 
 /* Window size change. */
