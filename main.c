@@ -120,6 +120,7 @@ usage()
 	       "\t\t     none: Don't redraw at all.\n"
 	       "\t\t   ctrl_l: Send a Ctrl L character to the program.\n"
 	       "\t\t    winch: Send a WINCH signal to the program.\n"
+	       "\t\t     tstp: Suspend and resume the program.\n"
 	       "  -z\t\tDisable processing of the suspend key.\n"
 	       "\nReport any bugs to <" PACKAGE_BUGREPORT ">.\n",
 		PACKAGE_VERSION, __DATE__, __TIME__);
@@ -246,6 +247,8 @@ main(int argc, char **argv)
 					redraw_method = REDRAW_CTRL_L;
 				else if (strcmp(argv[0], "winch") == 0)
 					redraw_method = REDRAW_WINCH;
+				else if (strcmp(argv[0], "tstp") == 0)
+					redraw_method = REDRAW_TSTP;
 				else
 				{
 					printf("%s: Invalid redraw method "

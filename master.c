@@ -272,6 +272,33 @@ pty_activity(int s)
 		exit(1);
 	}
 
+	/* Resume a program that suspended itself (REDRAW_TSTP) */
+	if (redraw_method == REDRAW_TSTP)
+	{
+		static const char marker[] = "\033[?2004l";
+		/* Has to be kept between reads! */
+		static size_t matched;
+		ssize_t i;
+
+		for (i = 0; i < len; i++)
+		{
+			/* Start over from this byte on mismatch */
+			if (buf[i] != marker[matched])
+			{
+				matched = 0;
+			}
+			if (buf[i] == marker[matched])
+			{
+				matched++;
+			}
+			if (matched == sizeof(marker) - 1)
+			{
+				matched = 0;
+				killpty(&the_pty, SIGCONT);
+			}
+		}
+	}
+
 #ifdef BROKEN_MASTER
 	/* Get the current terminal settings. */
 	if (tcgetattr(the_pty.slave, &the_pty.term) < 0)
@@ -441,6 +468,11 @@ client_activity(struct client *p)
 		else if (method == REDRAW_WINCH)
 		{
 			killpty(&the_pty, SIGWINCH);
+		}
+		/* Suspend the program (like Ctrl+Z would). */
+		else if (method == REDRAW_TSTP)
+		{
+			killpty(&the_pty, SIGTSTP);
 		}
 	}
 }

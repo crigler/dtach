@@ -113,6 +113,7 @@ enum
 	REDRAW_NONE	= 1,
 	REDRAW_CTRL_L	= 2,
 	REDRAW_WINCH	= 3,
+	REDRAW_TSTP	= 4,
 };
 
 /* The client to master protocol. */
