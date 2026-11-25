@@ -147,16 +147,20 @@ Sets the redraw method to
 The valid methods are
 .IR none ,
 .IR ctrl_l ,
+.IR winch ,
 or
-.IR winch .
+.IR tstp .
 
 .I none
 disables redrawing completely,
 .I ctrl_l
 sends a Ctrl L character to the program if the terminal is in
-character-at-a-time and no-echo mode, and
+character-at-a-time and no-echo mode,
 .I winch
-forces a WINCH signal to be sent to the program.
+forces a WINCH signal to be sent to the program, and
+.I tstp
+suspends and resumes the program. Use it for a program
+that sets up the terminal again when resumed to redraw content.
 
 When creating a new session, the specified method is used as the default
 redraw method for the session. If not specified, the
