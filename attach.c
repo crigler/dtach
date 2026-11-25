@@ -16,6 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "dtach.h"
+#include <ctype.h>
 
 #ifndef VDISABLE
 #ifdef _POSIX_VDISABLE
@@ -100,6 +101,39 @@ win_change(ATTRIBUTE_UNUSED int sig)
 {
 	signal(SIGWINCH, win_change);
 	win_changed = 1;
+}
+
+/* Checks if buf starts with the detach char */
+static int
+is_kitty_detach(const char *buf)
+{
+	enum {
+        CTRL = 4,
+        CAPS_LOCK = 64,
+        NUM_LOCK = 128
+    };
+	int key;
+	int modifiers;
+	char end;
+
+	if (detach_char < 0 || detach_char >= 0x20)
+	{
+		return 0;
+	}
+
+	if (sscanf(buf, "\033[%d;%d%c", &key, &modifiers, &end) != 3 ||
+	    end != 'u')
+	{
+		return 0;
+	}
+
+	if (key != tolower('@' + detach_char))
+	{
+		return 0;
+	}
+
+	modifiers = (modifiers - 1) & ~(CAPS_LOCK | NUM_LOCK);
+	return modifiers == CTRL;
 }
 
 /* Handles input from the keyboard. */
@@ -269,17 +303,37 @@ attach_main(int noerror)
 		/* stdin activity */
 		if (n > 0 && FD_ISSET(0, &readfds))
 		{
-			ssize_t len;
-
-			pkt.type = MSG_PUSH;
-			memset(pkt.u.buf, 0, sizeof(pkt.u.buf));
-			len = read(0, pkt.u.buf, sizeof(pkt.u.buf));
+			/* A Kitty key can be longer than a packet */
+			ssize_t len = read(0, buf, sizeof(buf) - 1);
+			ssize_t i;
 
 			if (len <= 0)
+			{
 				exit(1);
+			}
 
-			pkt.len = len;
-			process_kbd(s, &pkt);
+			buf[len] = 0;
+			if (is_kitty_detach((char *)buf))
+			{
+				printf(EOS "\r\n[detached]\r\n");
+				exit(0);
+			}
+
+			for (i = 0; i < len; i += sizeof(pkt.u.buf))
+			{
+				size_t left = len - i;
+
+				pkt.type = MSG_PUSH;
+				memset(pkt.u.buf, 0, sizeof(pkt.u.buf));
+				pkt.len = sizeof(pkt.u.buf);
+				if (left < sizeof(pkt.u.buf))
+				{
+					pkt.len = left;
+				}
+
+				memcpy(pkt.u.buf, buf + i, pkt.len);
+				process_kbd(s, &pkt);
+			}
 			n--;
 		}
 
